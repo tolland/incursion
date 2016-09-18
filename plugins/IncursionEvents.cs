@@ -217,19 +217,20 @@ namespace Oxide.Plugins
             esm.eg.AddPlayerToTeam(player, team);
            
         }
-   
 
         void ResetPlayerStatuses()
         {
             List<string> zones = (List<string>)ZoneManager.Call("GetZoneList");
-            foreach (string zone in zones)
+            if (zones != null)
             {
-                foreach (BasePlayer player in BasePlayer.activePlayerList)
+                foreach (string zone in zones)
                 {
-                    ZoneManager.Call("RemovePlayerFromZoneKeepinlist", zone, player);
+                    foreach (BasePlayer player in BasePlayer.activePlayerList)
+                    {
+                        ZoneManager.Call("RemovePlayerFromZoneKeepinlist", zone, player);
+                    }
                 }
             }
-
         }
 
 
