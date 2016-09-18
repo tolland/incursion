@@ -1,0 +1,17 @@
+{
+  "Backround": {
+    "Enabled": false,
+    "ImageURL": "https://i.ytimg.com/vi/yaqe1qesQ8c/maxresdefault.jpg"
+  },
+  "Messages": {
+    "KICK_MESSAGE": "You disagreed with the rules!",
+    "RULES_MESSAGE": [
+	"<color=red>This is a development server. Things may be broken</color>",
+	"<color=red>Currently working on an game events service.</color>"
+    
+    ]
+  },
+  "Settings": {
+    "DisplayOnEveryConnect": true
+  }
+}
