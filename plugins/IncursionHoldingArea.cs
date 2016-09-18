@@ -1,22 +1,11 @@
 ﻿//Requires: ZoneManager
 //Requires: IemUtils
-using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
-using System.Text;
 using Oxide.Core;
 using Oxide.Core.Plugins;
 using UnityEngine;
-using System.Collections.Generic;
-using System;
-using System.Reflection;
-using System.Data;
-using UnityEngine;
-using Oxide.Core;
-using Oxide.Core.Libraries;
-using Oxide.Core.Plugins;
-using Oxide.Game.Rust.Cui;
 
 namespace Oxide.Plugins
 {
@@ -27,6 +16,7 @@ namespace Oxide.Plugins
 
         [PluginReference]
         Plugin ZoneManager;
+
         [PluginReference]
         IemUtils IemUtils;
         
