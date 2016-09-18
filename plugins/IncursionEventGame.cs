@@ -16,11 +16,13 @@ namespace Oxide.Plugins
 
     public class IncursionEventGame : RustPlugin
     {
-
+    	[PluginReference]
         IncursionUI IncursionUI;
 
+		[PluginReference]
         IemUtils IemUtils;
 
+		[PluginReference]
         IncursionStateManager IncursionStateManager;
 
         static IncursionEventGame incursionEventGame = null;
