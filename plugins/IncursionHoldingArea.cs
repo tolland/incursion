@@ -5,6 +5,8 @@ using System.Linq;
 using System.Reflection;
 using Oxide.Core;
 using Oxide.Core.Plugins;
+using Oxide.Core.Configuration;
+using Newtonsoft.Json;
 using UnityEngine;
 
 namespace Oxide.Plugins
@@ -17,7 +19,7 @@ namespace Oxide.Plugins
         [PluginReference]
         Plugin ZoneManager;
 
-        [PluginReference]
+		[PluginReference]
         IemUtils IemUtils;
         
 
@@ -237,19 +239,13 @@ namespace Oxide.Plugins
 
         public static void OpenTeamDoors()
         {
-
-
-
             if (teamLobbyDoors.Count > 0)
             {
                 foreach (KeyValuePair<Vector3, TeamLobbyDoor> teamLobbyDoor in teamLobbyDoors)
                 {
-
-                    teamLobbyDoor.Value.OpenDoor(true);
-
+                    teamLobbyDoor.Value.OpenDoor();
                 }
             }
-
         }
 
         public static void OpenTeamDoors111()
@@ -282,14 +278,11 @@ namespace Oxide.Plugins
 
         public static void CloseTeamDoors()
         {
-
             if (teamLobbyDoors.Count > 0)
             {
                 foreach (KeyValuePair<Vector3, TeamLobbyDoor> teamLobbyDoor in teamLobbyDoors)
                 {
-
-                    teamLobbyDoor.Value.OpenDoor(false);
-
+                    teamLobbyDoor.Value.CloseDoor();
                 }
             }
         }
@@ -363,48 +356,36 @@ namespace Oxide.Plugins
             }
         }
 
-        void FindMonument()
-        {
-            GameObject[] allobjects = UnityEngine.Object.FindObjectsOfType<GameObject>();
+		List<MonumentInfo> FindMonuments (string name)
+		{
+			var monuments = new List<MonumentInfo>();
+			foreach (var info in IemUtils.monuments) {
+				if (info.name.Contains (name)) {
+					monuments.Add(info);
+				}
+			}
 
-            foreach (var monument_gobject in allobjects)
-            {
-                //DLog("object is " + monument_gobject.name);
+			return monuments;
+		}
 
-                if (monument_gobject.name.Contains("autospawn/monument"))
-                {
-                    //Puts (gobject.GetInstanceID ().ToString ());
+        void FindWarehouses ()
+		{
+			var warehouses = FindMonuments ("warehouse");
 
-
-                    var pos = monument_gobject.transform.position;
-                    //Puts(pos.ToString());
-
-                    if (monument_gobject.name.Contains("warehouse"))
-                    {
-                        //  if (configData.Zones.Lighthouse.Activate)
-                        //CreateArena(monument_gobject, pos, "Lighthouse", 80);
-                        //DLog("CreateEsmLobby at " + monument_gobject.GetInstanceID());
-                        //esm.eventLobby = new IncursionHoldingArea.Lobby(pos);
-                        //esm.eventLobby = new IncursionHoldingArea.Lobby(new Vector3(-231, 2, 14));
-                        break;
-                    }
-
-
-                }
-            }
-
+			foreach (var warehouse in warehouses) {
+				//CreateArena(monument_gobject, pos, "Lighthouse", 80);
+                //DLog("CreateEsmLobby at " + monument_gobject.GetInstanceID());
+                //esm.eventLobby = new IncursionHoldingArea.Lobby(pos);
+                //esm.eventLobby = new IncursionHoldingArea.Lobby(new Vector3(-231, 2, 14));
+			}
         }
 
         static int doorColl = UnityEngine.LayerMask.GetMask(new string[] { "Construction Trigger", "Construction" });
 
         class TeamLobbyDoor
         {
-            public string x;
-            public string y;
-            public string z;
-
             Door door;
-            Vector3 pos = default(Vector3);
+            public Vector3 position = default(Vector3);
 
             public string team;
 
@@ -414,56 +395,50 @@ namespace Oxide.Plugins
 
             public TeamLobbyDoor(Vector3 pos)
             {
-                this.x = pos.x.ToString();
-                this.y = pos.y.ToString();
-                this.z = pos.z.ToString();
-                this.pos = new Vector3(float.Parse(this.x), float.Parse(this.y), float.Parse(this.z));
+            	this.position = pos;
                 team = "red";
             }
-            public bool OpenDoor(bool openclose)
-            {
-                if (door == null)
-                    door = FindDoor();
-                if (door == null) return false;
-                //door.SetFlag(BaseEntity.Flags.Open, openclose);
-                door.SendNetworkUpdateImmediate(false);
-                if (openclose)
-                {
-                    door.SetFlag(BaseEntity.Flags.Open, true);
-                    door.SendNetworkUpdateImmediate(true);
-                }
-                else
-                {
-                    door.SetFlag(BaseEntity.Flags.Open, false);
-                    door.SendNetworkUpdateImmediate(true);
-                }
+
+            public void OpenDoor ()
+			{
+				Door door;
+				if (!TryGetDoor (out door)) {
+					return;
+				}
+
+				door.SendNetworkUpdateImmediate(false);
+				door.SetFlag(BaseEntity.Flags.Open, true);
+                door.SendNetworkUpdateImmediate(true);
+			}
+
+			public void CloseDoor() {
+				Door door;
+				if (!TryGetDoor (out door)) {
+					return;
+				}
+
+				door.SendNetworkUpdateImmediate(false);
+				door.SetFlag(BaseEntity.Flags.Open, false);
+                door.SendNetworkUpdateImmediate(true);
+			}
+
+            bool TryGetDoor (out Door door)
+			{
+				if (this.door != null) {
+					door = this.door;
+					return true;
+				}
+
+				List<Door> doors = new List<Door> ();
+				Vis.Entities<Door> (position, 1f, doors, doorColl);
+
+				if (doors.Count == 0) {
+					door = null;
+					return false;
+				}
+                door = doors[0];
                 return true;
             }
-            public Vector3 Pos()
-            {
-                if (pos == default(Vector3))
-                    pos = new Vector3(float.Parse(this.x), float.Parse(this.y), float.Parse(this.z));
-                return pos;
-            }
-            Door FindDoor()
-            {
-                foreach (Collider col in Physics.OverlapSphere(Pos(), 2f, doorColl))
-                {
-                    if (col.GetComponentInParent<Door>() == null) continue;
-
-
-                    if (Mathf.Ceil(col.transform.position.x) == Mathf.Ceil(pos.x)
-                        && Mathf.Ceil(col.transform.position.y) == Mathf.Ceil(pos.y)
-                        && Mathf.Ceil(col.transform.position.z) == Mathf.Ceil(pos.z))
-                    {
-                        Plugins.IemUtils.DLog("found the door");
-                        door = col.GetComponentInParent<Door>();
-                    }
-                }
-                return door;
-            }
-
-
         }
 
         static Hash<Vector3, TeamLobbyDoor> teamLobbyDoors
@@ -474,14 +449,14 @@ namespace Oxide.Plugins
             teamLobbyDoors.Clear();
             try
             {
-                storedData = Interface.GetMod().DataFileSystem.ReadObject<StoredData>("TeamLobbyDoors");
+                storedData = Interface.Oxide.DataFileSystem.ReadObject<StoredData>("TeamLobbyDoors");
             }
             catch
             {
                 storedData = new StoredData();
             }
             foreach (var remote in storedData.TeamLobbyDoors)
-                teamLobbyDoors[remote.Pos()] = remote;
+                teamLobbyDoors[remote.position] = remote;
         }
 
         void Unloaded()
@@ -491,7 +466,9 @@ namespace Oxide.Plugins
 
         void SaveData()
         {
-            Interface.GetMod().DataFileSystem.WriteObject("TeamLobbyDoors", storedData);
+			DynamicConfigFile file = Interface.Oxide.DataFileSystem.GetDatafile("TeamLobbyDoors");
+            file.Settings.ReferenceLoopHandling = ReferenceLoopHandling.Ignore; // allows you to store Vector3
+            file.WriteObject<StoredData>(storedData);
         }
 
         static StoredData storedData;
@@ -600,5 +577,4 @@ namespace Oxide.Plugins
             CloseTeamDoors();
         }
     }
-
 }

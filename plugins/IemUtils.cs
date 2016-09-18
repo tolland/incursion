@@ -1,5 +1,7 @@
 ﻿//Requires: ZoneManager
 using System;
+using System.Reflection;
+using System.Collections.Generic;
 using Oxide.Core.Plugins;
 using UnityEngine;
 using Random = System.Random;
@@ -13,12 +15,16 @@ namespace Oxide.Plugins
 
         [PluginReference]
         Plugin ZoneManager;
+		static Oxide.Game.Rust.Libraries.Rust rust = GetLibrary<Oxide.Game.Rust.Libraries.Rust>();
+		static FieldInfo monumentsField = typeof(TerrainPath).GetField("Monuments", (BindingFlags.Public | BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
+		public static List<MonumentInfo> monuments = new List<MonumentInfo>();
 
         static IemUtils iemUtils = null;
 
         void Init()
         {
             iemUtils = this;
+			monuments = (List<MonumentInfo>)monumentsField.GetValue(TerrainMeta.Path);
         }
 
         #region Functions
@@ -133,9 +139,13 @@ namespace Oxide.Plugins
 
         public static void MovePlayerTo(BasePlayer player, Vector3 loc)
         {
-            player.MovePosition(loc);
-            player.ClientRPCPlayer(null, player, "ForcePositionTo", player.transform.position);
-            player.TransformChanged();
+			if (player.inventory.loot.IsLooting())
+            {
+                player.EndLooting();
+            }
+			player.CancelInvoke("InventoryUpdate");
+            player.inventory.crafting.CancelAll(true);
+	        rust.ForcePlayerPosition(player, loc.x, loc.y, loc.z);
             player.SendNetworkUpdateImmediate();
         }
 

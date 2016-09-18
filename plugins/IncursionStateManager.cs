@@ -52,6 +52,16 @@ namespace Oxide.Plugins
                 return currentState;
             }
 
+			public bool IsAny (params IStateMachine[] states)
+			{
+				foreach (var state in states) {
+					if (state.Equals (currentState)) {
+						return true;
+					}
+				}
+
+				return false;
+			}
         }
 
         public interface IStateMachine

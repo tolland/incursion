@@ -17,12 +17,10 @@ namespace Oxide.Plugins
     public class IncursionEventGame : RustPlugin
     {
 
-        [PluginReference]
         IncursionUI IncursionUI;
 
-        [PluginReference] IemUtils IemUtils;
+        IemUtils IemUtils;
 
-        [PluginReference]
         IncursionStateManager IncursionStateManager;
 
         static IncursionEventGame incursionEventGame = null;
@@ -62,15 +60,15 @@ namespace Oxide.Plugins
             public int MaxPlayers { get; set; }
 
             //can players spectate when dead, or not in game
-            public Boolean CanSpectate { get; set; }
+            public bool CanSpectate { get; set; }
 
             //if true, event manager will call end game
-            public Boolean TimedGame { get; set; }
+            public bool TimedGame { get; set; }
 
             //time limit in seconds
             public int TimeLimit { get; set; }
 
-            public Boolean autoStart { get; set; }
+            public bool autoStart { get; set; }
 
             public Vector3 Location { get; set; }
             public List<string> GameIntroBanner { get; set; }
@@ -121,24 +119,24 @@ namespace Oxide.Plugins
                 Location = new Vector3(-396, 3, -25);
             }
 
-            public Boolean IsOpen()
+            public bool IsOpen()
             {
                 return true;
             }
 
-            public Boolean SetStartGame()
+            public bool SetStartGame()
             {
                 IemUtils.DLog("entry into EventLobbyOpen");
                 incursionEventGame.rust.RunServerCommand("env.time", "12");
                 return true;
             }
 
-            public Boolean PauseGame()
+            public bool PauseGame()
             {
                 return true;
             }
 
-            public Boolean EndGame()
+            public bool EndGame()
             {
                 return true;
             }
@@ -148,13 +146,13 @@ namespace Oxide.Plugins
                 return 5;
             }
 
-            public Boolean InitializePlayingField()
+            public bool InitializePlayingField()
             {
 
                 return true;
             }
 
-            Boolean ClearPlayingField()
+            bool ClearPlayingField()
             {
 
                 return true;

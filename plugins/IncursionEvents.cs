@@ -18,19 +18,22 @@ namespace Oxide.Plugins
     [Info("Incursion Events", "Tolland", "0.1.0")]
     public class IncursionEvents : RustPlugin
     {
-        [PluginReference]
+
+    	#region Variables
+
+		[PluginReference]
         IncursionEventGame IncursionEventGame;
 
-        [PluginReference]
+		[PluginReference]
         IncursionStateManager IncursionStateManager;
 
-        [PluginReference]
+		[PluginReference]
         IncursionHoldingArea IncursionHoldingArea;
 
-        [PluginReference]
+		[PluginReference]
         IncursionUI IncursionUI;
 
-        [PluginReference]
+		[PluginReference]
         IemUtils IemUtils;
 
         [PluginReference]
@@ -39,14 +42,13 @@ namespace Oxide.Plugins
         private EventStateManager esm;
         static IncursionEvents incursionEvents = null;
 
-        void Init()
-        {
-            incursionEvents = this;
-        }
+		StoredData storedData;
 
+        #endregion
 
+        #region Boilerplate
 
-        class StoredEventPlayer
+		class StoredEventPlayer
         {
             public string UserId;
             public string Name;
@@ -72,8 +74,12 @@ namespace Oxide.Plugins
             }
         }
 
+        #endregion
 
-        StoredData storedData;
+        void Init()
+        {
+            incursionEvents = this;
+        }
 
         void Loaded()
         {
@@ -259,10 +265,7 @@ namespace Oxide.Plugins
                 }
             }
 
-            if (esm.GetState().Equals(EventManagementLobby.Instance)
-                || esm.GetState().Equals(EventLobbyOpen.Instance)
-                || esm.GetState().Equals(EventLobbyClosed.Instance)
-                )
+			if(esm.IsAny(EventManagementLobby.Instance, EventLobbyOpen.Instance, EventLobbyClosed.Instance))
             {
                 //TeleportPlayerPosition(player, esm.eventLobby.location);
                 Puts("need to teleport player");
@@ -280,15 +283,9 @@ namespace Oxide.Plugins
                 eventPlayer.psm.ChangeState(IncursionEventGame.PlayerInEventLobbyNoTeam.Instance);
             }
 
-            if (esm.GetState().Equals(GameStartedAndOpen.Instance)
-                || esm.GetState().Equals(GameStartedAndClosed.Instance)
-                || esm.GetState().Equals(GameStartedAndPaused.Instance)
-            )
+			if(esm.IsAny(GameStartedAndOpen.Instance, GameStartedAndClosed.Instance, GameStartedAndPaused.Instance))
             {
-                player.MovePosition(eventPlayer.eventTeam.Location);
-                player.ClientRPCPlayer(null, player, "ForcePositionTo", player.transform.position);
-                player.TransformChanged();
-                player.SendNetworkUpdateImmediate();
+            	IemUtils.MovePlayerTo(player, eventPlayer.eventTeam.Location);
             }
         }
 
@@ -332,10 +329,7 @@ namespace Oxide.Plugins
 
         BasePlayer.SpawnPoint OnFindSpawnPoint()
         {
-            if (esm.GetState().Equals(EventManagementLobby.Instance)
-                || esm.GetState().Equals(EventLobbyOpen.Instance)
-                || esm.GetState().Equals(EventLobbyClosed.Instance)
-               )
+			if(esm.IsAny(EventManagementLobby.Instance, EventLobbyOpen.Instance, EventLobbyClosed.Instance))
             {
                 //@todo move this code
                 vectorUp = new Vector3(0f, Convert.ToSingle(CheckUp), 0f);
@@ -493,10 +487,7 @@ namespace Oxide.Plugins
         void OnPlayerAddedToTeam(IncursionEventGame.EventTeam team, BasePlayer player)
         {
             IemUtils.DLog("calling update team");
-            if (esm.GetState().Equals(EventManagementLobby.Instance)
-                || esm.GetState().Equals(EventLobbyOpen.Instance)
-                || esm.GetState().Equals(EventLobbyClosed.Instance)
-            )
+			if(esm.IsAny(EventManagementLobby.Instance, EventLobbyOpen.Instance, EventLobbyClosed.Instance))
             {
                 esm.Update();
             }
@@ -732,4 +723,3 @@ namespace Oxide.Plugins
 
 
 }
-
