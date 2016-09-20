@@ -26,14 +26,22 @@ namespace Oxide.Plugins
 
             public StateManager(IStateMachine initialState)
             {
+                if (initialState == null)
+                    return;
+
                 //set the initial state
                 currentState = initialState;
+                //@todo not sure if this is correct. should we enter the initial state?
+                currentState.Enter(this);
+
             }
+
 
             //in the state patten, this is used to execute the current state
             //not sure if this is relevant to this system???
             public void Update()
             {
+                incursionStateManager.Puts(this.ToString());
                 currentState.Execute(this);
             }
 

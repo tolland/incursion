@@ -36,6 +36,8 @@ namespace Oxide.Plugins
             {
                 CuiHelper.DestroyUi(player, "GameBanner");
                 CuiHelper.DestroyUi(player, "adminbannerMessage");
+                CuiHelper.DestroyUi(player, "adminbannerMessage2");
+                CuiHelper.DestroyUi(player, "adminbannerMessage3");
                 CuiHelper.DestroyUi(player, "jailTimer");
                 CuiHelper.DestroyUi(player, "bannerMessage");
                 CuiHelper.DestroyUi(player, "eventmessage");
@@ -142,11 +144,50 @@ namespace Oxide.Plugins
                 var container = UI.CreateElementContainer(
                     "adminbannerMessage",
                     "0.3 0.3 0.3 0.6",
-                    "0.22 0.895",
+                    "0.22 0.920",
                     "0.78 0.945",
                     false);
                 UI.CreateLabel(ref container, "adminbannerMessage", "",
-                    $"{ARENA}", 18, "0 0", "1 1");
+                    $"{ARENA}", 14, "0 0", "1 1");
+                CuiHelper.AddUi(player, container);
+            }
+        }
+        public static void CreateAdminBanner2(BasePlayer player, string message)
+        {
+            string ARENA = $"{message}";
+
+            List<BasePlayer> activePlayers = BasePlayer.activePlayerList;
+
+
+            CuiHelper.DestroyUi(player, "adminbannerMessage2");
+            var container = UI.CreateElementContainer(
+                "adminbannerMessage2",
+                "0.3 0.3 0.3 0.6",
+                "0.22 0.895",
+                "0.78 0.920",
+                false);
+            UI.CreateLabel(ref container, "adminbannerMessage2", "",
+                $"{ARENA}", 14, "0 0", "1 1");
+            CuiHelper.AddUi(player, container);
+
+        }
+        public static void CreateAdminBanner3(string message)
+        {
+            string ARENA = $"{message}";
+
+            List<BasePlayer> activePlayers = BasePlayer.activePlayerList;
+
+            foreach (BasePlayer player in activePlayers)
+            {
+                CuiHelper.DestroyUi(player, "adminbannerMessage3");
+                var container = UI.CreateElementContainer(
+                    "adminbannerMessage3",
+                    "0.3 0.3 0.3 0.6",
+                    "0.22 0.870",
+                    "0.78 0.895",
+                    false);
+                UI.CreateLabel(ref container, "adminbannerMessage3", "",
+                    $"{ARENA}", 14, "0 0", "1 1");
                 CuiHelper.AddUi(player, container);
             }
         }
@@ -214,65 +255,63 @@ namespace Oxide.Plugins
             {"0.0 0.1","0.4 0.50" },
            {"0.6 0.1","1.0 0.50" }
         };
-        public static void ShowResultsUi(List<UiTeamResult> teamData)
+        public static void ShowResultsUi(BasePlayer player, List<UiTeamResult> teamData)
         {
 
 
-            foreach (BasePlayer player in BasePlayer.activePlayerList)
+            int teamSlot = 0;
+
+            CuiHelper.DestroyUi(player, "game_results_overlay");
+
+            var container = UI.CreateElementContainer(
+                "game_results_overlay",
+                "0.6 0.3 0.3 1.0",
+                "0.15 0.12",
+                "0.85 0.9",
+                false);
+
+            foreach (UiTeamResult item in teamData)
             {
-                int teamSlot = 0;
+                //IemUtils.DLog(item.TeamName);
+                CuiHelper.DestroyUi(player, item.TeamName);
 
-                CuiHelper.DestroyUi(player, "game_results_overlay");
+                //IemUtils.DLog("teamSlots[teamSlot,0] = " + teamSlots[teamSlot, 0]);
+                //IemUtils.DLog("teamSlots[teamSlot,1] = " + teamSlots[teamSlot, 1]);
 
-                var container = UI.CreateElementContainer(
+
+                UI.CreateLabel(ref container,
                     "game_results_overlay",
-                    "0.6 0.3 0.3 1.0",
-                    "0.15 0.12",
-                    "0.85 0.9",
-                    false);
+                    GetColor(item.Color),
+                    item.TeamName,
+                    28,
+                    teamSlotsResults[teamSlot, 0],
+                    teamSlotsResults[teamSlot, 1],
+                    TextAnchor.UpperCenter);
 
-                foreach (UiTeamResult item in teamData)
+
+
+                string playerListString = "\n\n";
+                foreach (string playerName in item.Players)
                 {
-                    IemUtils.DLog(item.TeamName);
-                    CuiHelper.DestroyUi(player, item.TeamName);
-
-                    IemUtils.DLog("teamSlots[teamSlot,0] = " + teamSlots[teamSlot, 0]);
-                    IemUtils.DLog("teamSlots[teamSlot,1] = " + teamSlots[teamSlot, 1]);
-
-
-                    UI.CreateLabel(ref container,
-                        "game_results_overlay",
-                        GetColor(item.Color),
-                        item.TeamName,
-                        28,
-                        teamSlotsResults[teamSlot, 0],
-                        teamSlotsResults[teamSlot, 1],
-                        TextAnchor.UpperCenter);
-
-
-
-                    string playerListString = "\n\n";
-                    foreach (string playerName in item.Players)
-                    {
-                        playerListString = playerListString + playerName + "\n";
-                    }
-
-                    UI.CreateLabel(ref container, "game_results_overlay", "",
-                        $"{playerListString}",
-                        18,
-                        teamSlotsResults[teamSlot, 0],
-                        teamSlotsResults[teamSlot, 1],
-                        TextAnchor.UpperCenter);
-
-                    teamSlot++;
+                    playerListString = playerListString + playerName + "\n";
                 }
 
-                //UI.CreateButton(ref container, "game_results_overlay", "",
-                //   "I agree",
-                //    22,
-                //    "0.4 0.16",
-                //    "0.6 0.2",
-                //    TextAnchor.LowerCenter);
+                UI.CreateLabel(ref container, "game_results_overlay", "",
+                    $"{playerListString}",
+                    18,
+                    teamSlotsResults[teamSlot, 0],
+                    teamSlotsResults[teamSlot, 1],
+                    TextAnchor.UpperCenter);
+
+                teamSlot++;
+            }
+
+            //UI.CreateButton(ref container, "game_results_overlay", "",
+            //   "I agree",
+            //    22,
+            //    "0.4 0.16",
+            //    "0.6 0.2",
+            //    TextAnchor.LowerCenter);
 
             //elements.Add(new CuiButton
             //{
@@ -294,8 +333,8 @@ namespace Oxide.Plugins
             //    }
             //}, mainName); ;
 
-                CuiHelper.AddUi(player, container);
-            }
+            CuiHelper.AddUi(player, container);
+
         }
 
         private static string[,] teamSlots =
@@ -378,11 +417,11 @@ namespace Oxide.Plugins
 
             foreach (UiTeam item in teamData)
             {
-                IemUtils.DLog(item.TeamName);
+                //IemUtils.DLog(item.TeamName);
                 CuiHelper.DestroyUi(player, item.TeamName);
 
-                IemUtils.DLog("teamSlots[teamSlot,0] = " + teamSlots[teamSlot, 0]);
-                IemUtils.DLog("teamSlots[teamSlot,1] = " + teamSlots[teamSlot, 1]);
+                //IemUtils.DLog("teamSlots[teamSlot,0] = " + teamSlots[teamSlot, 0]);
+                //IemUtils.DLog("teamSlots[teamSlot,1] = " + teamSlots[teamSlot, 1]);
 
 
 
@@ -606,6 +645,21 @@ namespace Oxide.Plugins
                 case "removeteamsui":
                     SendReply(arg, "removing teams UI");
                     RemoveTeamUI();
+                    return;
+
+                case "ab1":
+                    SendReply(arg, "admin banner 1");
+                    CreateAdminBanner("test1");
+                    return;
+
+                case "ab2":
+                    SendReply(arg, "2");
+                    CreateAdminBanner2(arg.Player(), "test2");
+                    return;
+
+                case "ab3":
+                    SendReply(arg, "3");
+                    CreateAdminBanner3("test3");
                     return;
 
 

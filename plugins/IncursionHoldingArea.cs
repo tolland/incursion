@@ -51,7 +51,6 @@ namespace Oxide.Plugins
         void OnEnterZone(string ZoneID, BasePlayer player)
         {
             Puts("player is " + player.displayName + " has entered zone " + ZoneID);
-
         }
 
         //void OnExitZone(string ZoneID, BasePlayer player)
@@ -96,10 +95,10 @@ namespace Oxide.Plugins
         void OnDoorClosed(Door door, BasePlayer player)
 
         {
-            Puts("OnDoorOpened works!");
-            Puts("door is " + door.name);
-            Puts("door is " + door.GetHashCode().ToString());
-            Puts("door is " + door.GetInstanceID().ToString());
+            //Puts("OnDoorOpened works!");
+            //Puts("door is " + door.name);
+            //Puts("door is " + door.GetHashCode().ToString());
+            //Puts("door is " + door.GetInstanceID().ToString());
 
             //CloseDoors();
         }
@@ -341,7 +340,7 @@ namespace Oxide.Plugins
         {
 
             //Vis.Entit
-            Puts("  >>>>>>Destroy all spheres");
+            //Puts("  >>>>>>Destroy all spheres");
 
             //foreach (SphereEntity se in BaseEntity.FindObjectsOfType<SphereEntity> ()) {
             //se.KillMessage ();
@@ -354,8 +353,8 @@ namespace Oxide.Plugins
             {
                 if (entity.prefabID == prefabID)
                 {
-                    Puts("found entity with prefabID "
-                         + entity.prefabID.ToString());
+                   // Puts("found entity with prefabID "
+               //          + entity.prefabID.ToString());
 
                     entity.KillMessage();
                     //entity.Kill ();
@@ -456,7 +455,7 @@ namespace Oxide.Plugins
                         && Mathf.Ceil(col.transform.position.y) == Mathf.Ceil(pos.y)
                         && Mathf.Ceil(col.transform.position.z) == Mathf.Ceil(pos.z))
                     {
-                        Plugins.IemUtils.DLog("found the door");
+                       // Plugins.IemUtils.DLog("found the door");
                         door = col.GetComponentInParent<Door>();
                     }
                 }

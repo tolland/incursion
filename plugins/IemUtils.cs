@@ -21,6 +21,31 @@ namespace Oxide.Plugins
             iemUtils = this;
         }
 
+        #region player modifications
+
+        public static void SetMetabolismValues(BasePlayer player)
+        {
+            player.metabolism.calories.max = 500;
+            player.metabolism.calories.value = 500;
+            player.health = 100;
+            //player.metabolism.health.max = 100;
+            player.metabolism.hydration.max = 250;
+            player.metabolism.hydration.value = 250;
+        }
+
+
+        public static void SetMetabolismNoNutrition(BasePlayer player)
+        {
+            player.metabolism.calories.max = 500;
+            player.metabolism.calories.value = 500;
+            player.metabolism.hydration.max = 250;
+            player.metabolism.hydration.value = 250;
+        }
+
+        
+
+        #endregion
+
         #region Functions
         //from em
         public bool hasAccess(ConsoleSystem.Arg arg)
@@ -61,7 +86,7 @@ namespace Oxide.Plugins
 
         public static void CreateZone(string name, Vector3 location, int radius)
         {
-            iemUtils.Puts("creating zone");
+            //iemUtils.Puts("creating zone");
 
             //ZoneManager.Call("EraseZone", "zone_" + name);
 
@@ -89,7 +114,7 @@ namespace Oxide.Plugins
             BaseEntity sphere = GameManager.server.CreateEntity(SphereEnt,
                 position, new Quaternion(), true);
             SphereEntity ent = sphere.GetComponent<SphereEntity>();
-            iemUtils.Puts("prefabID " + sphere.prefabID);
+            //iemUtils.Puts("prefabID " + sphere.prefabID);
 
             ent.currentRadius = radius;
             ent.lerpSpeed = 0f;
@@ -99,6 +124,39 @@ namespace Oxide.Plugins
         }
 
         #endregion
+
+
+        #region finding stuff
+
+        static int doorColl = UnityEngine.LayerMask.GetMask(new string[] { "Construction Trigger", "Construction" });
+
+
+        T FindComponentNearestToLocation<T>(Vector3 location, int radius)
+        {
+            T component = default(T);
+            foreach (Collider col in Physics.OverlapSphere(location, 2f, doorColl))
+            {
+                if (col.GetComponentInParent<Door>() == null) continue;
+
+
+                if (Mathf.Ceil(col.transform.position.x) == Mathf.Ceil(location.x)
+                    && Mathf.Ceil(col.transform.position.y) == Mathf.Ceil(location.y)
+                    && Mathf.Ceil(col.transform.position.z) == Mathf.Ceil(location.z))
+                {
+                    //Plugins.IemUtils.DLog("found the door");
+                    component = col.GetComponentInParent<T>();
+                }
+            }
+            if (component != null)
+                return component;
+            return default(T);
+        }
+
+
+
+
+        #endregion
+
 
         #region geo stuff
 
@@ -120,8 +178,8 @@ namespace Oxide.Plugins
 
         static void TeleportPlayerPosition(BasePlayer player, Vector3 destination)
         {
-            DLog("teleporting player from " + player.transform.position.ToString());
-            DLog("teleporting player to   " + destination.ToString());
+            //DLog("teleporting player from " + player.transform.position.ToString());
+            //DLog("teleporting player to   " + destination.ToString());
             player.MovePosition(destination);
             player.ClientRPCPlayer(null, player, "ForcePositionTo", destination);
             player.SetPlayerFlag(BasePlayer.PlayerFlags.ReceivingSnapshot, true);
@@ -145,12 +203,12 @@ namespace Oxide.Plugins
             //get a random angli in radians
             float randomAngle = (float)random.NextDouble() * (float)Math.PI * 2.0f;
 
-            iemUtils.Puts("random angle is " + randomAngle.ToString());
+            //iemUtils.Puts("random angle is " + randomAngle.ToString());
 
             Vector3 loc = centre;
 
-            iemUtils.Puts("x modifyier is " + ((float)Math.Cos(randomAngle) * radius));
-            iemUtils.Puts("z modifyier is " + ((float)Math.Sin(randomAngle) * radius));
+            //iemUtils.Puts("x modifyier is " + ((float)Math.Cos(randomAngle) * radius));
+            //iemUtils.Puts("z modifyier is " + ((float)Math.Sin(randomAngle) * radius));
 
             loc.x = loc.x + ((float)Math.Cos(randomAngle) * radius);
             loc.z = loc.z + ((float)Math.Sin(randomAngle) * radius);

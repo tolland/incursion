@@ -5,10 +5,6 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 using Oxide.Core;
-using Oxide.Core.Configuration;
-using Oxide.Core.Plugins;
-using Oxide.Game.Rust.Cui;
-using Steamworks;
 
 namespace Oxide.Plugins
 {
@@ -38,6 +34,9 @@ namespace Oxide.Plugins
         /// </summary>
         public class EventGame
         {
+            //this game is managed by this object
+            public GameStateManager gsm;
+
             //team or solo game
             public bool TeamGame { get; set; }
 
@@ -82,6 +81,10 @@ namespace Oxide.Plugins
             public int GameStartedDateTime { get; set; }
             public int GameEndedDateTime { get; set; }
 
+            public EventGame(GameStateManager gamestatemanager) : this()
+            {
+                gsm = gamestatemanager;
+            }
 
             public EventGame()
             {
@@ -92,7 +95,7 @@ namespace Oxide.Plugins
 
                 MinPlayers = 1;
                 MaxPlayers = 20;
-                MinPlayersPerTeam = 1;
+                MinPlayersPerTeam = 0;
                 MaxPlayersPerTeam = 12;
 
                 eventTeams.Add("team_1", new EventTeam("team_1", "Blue Team", 
@@ -121,19 +124,19 @@ namespace Oxide.Plugins
                 Location = new Vector3(-396, 3, -25);
             }
 
-            public Boolean IsOpen()
+            public bool IsOpen()
             {
                 return true;
             }
 
-            public Boolean SetStartGame()
+            public virtual bool StartGame()
             {
-                IemUtils.DLog("entry into EventLobbyOpen");
+                IemUtils.DLog("calling startgame in event game");
                 incursionEventGame.rust.RunServerCommand("env.time", "12");
                 return true;
             }
 
-            public Boolean PauseGame()
+            public bool PauseGame()
             {
                 return true;
             }
@@ -199,6 +202,9 @@ namespace Oxide.Plugins
 
             public EventTeam GetTeamById(string teamId)
             {
+                if(eventTeams==null)
+                    Plugins.IemUtils.DLog("eventTeams is null");
+
                 return eventTeams[teamId];
 
             }
@@ -316,7 +322,14 @@ namespace Oxide.Plugins
 
             public void ShowGameResultUI()
             {
-                IncursionUI.ShowResultsUi(ConvertResultsToUiTeamResults());
+                var gameresult = ConvertResultsToUiTeamResults();
+                foreach (IncursionEventGame.EventPlayer eventPlayer in gsm.eg.gamePlayers.Values)
+                {
+
+                    IncursionUI.ShowResultsUi(eventPlayer.player, gameresult);
+                }
+
+                
             }
 
             public void RemoveGameResultUI()
@@ -355,6 +368,27 @@ namespace Oxide.Plugins
             }
         }
 
+
+
+        public class GameStateManager : IncursionStateManager.StateManager
+        {
+            public string Name { get; set; }
+            public IncursionEventGame.EventPlayer eventPlayer;
+            public IncursionEventGame.EventGame eg;
+
+            public GameStateManager(IncursionStateManager.IStateMachine initialState, string name) : base(initialState)
+            {
+                IemUtils.DLog("creating a game state manager");
+                Name = name;
+            }
+
+
+
+            public virtual void ReinitializeGame()
+            {
+                eg = new IncursionEventGame.EventGame(this);
+            }
+        }
 
         public class PlayerStateManager : IncursionStateManager.StateManager
         {
@@ -408,7 +442,11 @@ namespace Oxide.Plugins
             public new void Enter(IncursionStateManager.StateManager psm)
             {
                 IemUtils.DLog("player is in the event Lobby, no game");
-                IncursionUI.CreateBanner("state:" + psm.GetState().ToString());
+
+                BasePlayer player = ((PlayerStateManager)psm).
+                eventPlayer.player;
+
+                IncursionUI.CreateAdminBanner2(player, "state:" + psm.GetState().ToString());
             }
 
         }
@@ -424,7 +462,9 @@ eventPlayer.player;
                 EventPlayer eventPlayer = ((PlayerStateManager)psm).
                 eventPlayer;
                 IemUtils.DLog("player is entering the PlayerInEventLobby");
-                IncursionUI.CreateBanner("state:" + psm.GetState().ToString());
+
+
+                IncursionUI.CreateAdminBanner2(player, "state:" + psm.GetState().ToString());
                 IncursionUI.ShowTeamUiForPlayer(player, eventPlayer.psm.eg.ConvertTeamsToDict());
             }
             public new void Exit(IncursionStateManager.StateManager psm)
@@ -446,7 +486,10 @@ eventPlayer.player;
                 EventPlayer eventPlayer = ((PlayerStateManager)psm).
                 eventPlayer;
                 IemUtils.DLog("player is entering the PlayerInEventLobbyNoTeam");
-                IncursionUI.CreateBanner("state:" + psm.GetState().ToString());
+
+                
+
+                IncursionUI.CreateAdminBanner2(player, "state:" + psm.GetState().ToString());
                 IncursionUI.ShowTeamUiForPlayer(player, 
                     eventPlayer.psm.eg.ConvertTeamsToDict());
             }
@@ -474,7 +517,8 @@ eventPlayer.player;
                 BroadcastChat("player " + player.displayName
                     + " has joined team " + eventPlayer.eventTeam.TeamName);
 
-                IncursionUI.CreateBanner("state:" + psm.GetState().ToString());
+
+                IncursionUI.CreateAdminBanner2(player, "state:" + psm.GetState().ToString());
                 IncursionUI.ShowTeamUi(eventPlayer.psm.eg.ConvertTeamsToDict());
 
                 Interface.Oxide.CallHook("OnPlayerAddedToTeam", eventPlayer.eventTeam, player);
@@ -495,7 +539,11 @@ eventPlayer.player;
             public new void Enter(IncursionStateManager.StateManager psm)
             {
                 IemUtils.DLog("player is EventLobbySolo");
-                IncursionUI.CreateBanner("state:" + psm.GetState().ToString());
+
+                BasePlayer player = ((PlayerStateManager)psm).
+                eventPlayer.player;
+
+                IncursionUI.CreateAdminBanner2(player, "state:" + psm.GetState().ToString());
             }
         }
 
@@ -505,7 +553,11 @@ eventPlayer.player;
             public new void Enter(IncursionStateManager.StateManager psm)
             {
                 IemUtils.DLog("player is PlayerInGameLobby");
-                IncursionUI.CreateBanner("state:" + psm.GetState().ToString());
+
+                BasePlayer player = ((PlayerStateManager)psm).
+                eventPlayer.player;
+
+                IncursionUI.CreateAdminBanner2(player, "state:" + psm.GetState().ToString());
             }
         }
 
@@ -516,7 +568,11 @@ eventPlayer.player;
             public new void Enter(IncursionStateManager.StateManager psm)
             {
                 IemUtils.DLog("player is PlayerInGameTeamed");
-                IncursionUI.CreateBanner("state:" + psm.GetState().ToString());
+
+                BasePlayer player = ((PlayerStateManager)psm).
+                eventPlayer.player;
+
+                IncursionUI.CreateAdminBanner2(player, "state:" + psm.GetState().ToString());
             }
         }
 
@@ -542,7 +598,11 @@ eventPlayer.player;
             public new void Enter(IncursionStateManager.StateManager psm)
             {
                 IemUtils.DLog("player is PlayerInGameSolo");
-                IncursionUI.CreateBanner("state:" + psm.GetState().ToString());
+
+                BasePlayer player = ((PlayerStateManager)psm).
+                eventPlayer.player;
+
+                IncursionUI.CreateAdminBanner2(player, "state:" + psm.GetState().ToString());
             }
         }
 
