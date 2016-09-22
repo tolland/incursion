@@ -564,6 +564,7 @@ namespace Oxide.Plugins
         [ConsoleCommand("resetteamdoors")]
         void ccmdEvent14324(ConsoleSystem.Arg arg)
         {
+            if (!IemUtils.hasAccess(arg)) return;
             storedData.TeamLobbyDoors.Clear();
             teamLobbyDoors.Clear();
             SaveData();
@@ -573,29 +574,34 @@ namespace Oxide.Plugins
         [ConsoleCommand("door1")]
         void ccmdEvent1(ConsoleSystem.Arg arg)
         {
+            if (!IemUtils.hasAccess(arg)) return;
             OpenTeamDoors();
         }
 
         [ConsoleCommand("door")]
         void ccmdEvent(ConsoleSystem.Arg arg)
         {
+            if (!IemUtils.hasAccess(arg)) return;
             OpenTeamDoors();
         }
 
         [ConsoleCommand("opendoors")]
         void ccmd2Event(ConsoleSystem.Arg arg)
         {
+            if (!IemUtils.hasAccess(arg)) return;
             OpenDoors();
         }
 
         [ConsoleCommand("closedoors")]
         void ccmd21Event(ConsoleSystem.Arg arg)
         {
+            if (!IemUtils.hasAccess(arg)) return;
             CloseDoors();
         }
         [ConsoleCommand("closeteamdoors")]
         void ccmdCloseDoors(ConsoleSystem.Arg arg)
         {
+            if (!IemUtils.hasAccess(arg)) return;
             CloseTeamDoors();
         }
     }

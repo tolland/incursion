@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 using Oxide.Core;
+using Oxide.Core.Plugins;
 
 namespace Oxide.Plugins
 {
@@ -16,7 +17,11 @@ namespace Oxide.Plugins
         [PluginReference]
         IncursionUI IncursionUI;
 
-        [PluginReference] IemUtils IemUtils;
+        [PluginReference]
+        IemUtils IemUtils;
+
+        [PluginReference]
+        Plugin ZoneManager;
 
         [PluginReference]
         IncursionStateManager IncursionStateManager;
@@ -98,9 +103,9 @@ namespace Oxide.Plugins
                 MinPlayersPerTeam = 0;
                 MaxPlayersPerTeam = 12;
 
-                eventTeams.Add("team_1", new EventTeam("team_1", "Blue Team", 
+                eventTeams.Add("team_1", new EventTeam("team_1", "Blue Team",
                     new Vector3(-394, 3, -25), "blue"));
-                eventTeams.Add("team_2", new EventTeam("team_2", "Red Team", 
+                eventTeams.Add("team_2", new EventTeam("team_2", "Red Team",
                     new Vector3(-376, 3, 3), "red"));
                 //eventTeams.Add("team_3", new EventTeam("team_3", "Green Team", "green"));
                 //eventTeams.Add("team_4", new EventTeam("team_4", "Yellow Team", "yellow"));
@@ -145,6 +150,9 @@ namespace Oxide.Plugins
             {
                 return true;
             }
+
+
+            
 
             int TimeRemaining()
             {
@@ -202,7 +210,7 @@ namespace Oxide.Plugins
 
             public EventTeam GetTeamById(string teamId)
             {
-                if(eventTeams==null)
+                if (eventTeams == null)
                     Plugins.IemUtils.DLog("eventTeams is null");
 
                 return eventTeams[teamId];
@@ -216,20 +224,20 @@ namespace Oxide.Plugins
                 foreach (KeyValuePair<string, IncursionEventGame.EventTeam> teamPair in eventTeams)
                 {
                     EventTeam team = teamPair.Value;
-                    
+
                     List<string> players = new List<string>() { };
                     foreach (KeyValuePair<string, EventPlayer> player in team.teamPlayers)
                     {
                         players.Add(player.Value.player.displayName);
                     }
-                    IncursionUI.UiTeam uiTeam = new IncursionUI.UiTeam(team.TeamName,players,team.Colour);
+                    IncursionUI.UiTeam uiTeam = new IncursionUI.UiTeam(team.TeamName, players, team.Colour);
                     teamData.Add(uiTeam);
 
                 }
                 return teamData;
             }
 
-            
+
 
 
             public bool AddPlayerToTeam(BasePlayer player, EventTeam team)
@@ -279,6 +287,19 @@ namespace Oxide.Plugins
                 return true;
             }
 
+
+            public bool MovePlayerToGame(EventPlayer eventPlayer)
+            {
+
+                BasePlayer player = eventPlayer.player;
+                Plugins.IemUtils.DLog("moving player to game");
+
+                IemUtils.MovePlayerTo(player, eventPlayer.eventTeam.Location);
+
+
+                return true;
+            }
+
             public Dictionary<string, List<string>> ConvertResultsToDict()
             {
 
@@ -312,7 +333,8 @@ namespace Oxide.Plugins
                             + player.Value.Score.ToString());
                     }
                     IncursionUI.UiTeamResult result = new IncursionUI.UiTeamResult(team.Value.TeamName,
-                        players,team.Value.Colour) { };
+                        players, team.Value.Colour)
+                    { };
 
                     teamData.Add(result);
 
@@ -329,7 +351,7 @@ namespace Oxide.Plugins
                     IncursionUI.ShowResultsUi(eventPlayer.player, gameresult);
                 }
 
-                
+
             }
 
             public void RemoveGameResultUI()
@@ -381,13 +403,17 @@ namespace Oxide.Plugins
                 IemUtils.DLog("creating a game state manager");
                 Name = name;
             }
-
-
-
+            
             public virtual void ReinitializeGame()
             {
                 eg = new IncursionEventGame.EventGame(this);
             }
+
+            public virtual void UnloadGame()
+            {
+                throw new NotImplementedException();
+            }
+
         }
 
         public class PlayerStateManager : IncursionStateManager.StateManager
@@ -487,10 +513,10 @@ eventPlayer.player;
                 eventPlayer;
                 IemUtils.DLog("player is entering the PlayerInEventLobbyNoTeam");
 
-                
+
 
                 IncursionUI.CreateAdminBanner2(player, "state:" + psm.GetState().ToString());
-                IncursionUI.ShowTeamUiForPlayer(player, 
+                IncursionUI.ShowTeamUiForPlayer(player,
                     eventPlayer.psm.eg.ConvertTeamsToDict());
             }
 
@@ -514,7 +540,7 @@ eventPlayer.player;
                 EventPlayer eventPlayer = ((PlayerStateManager)psm).
                 eventPlayer;
 
-                BroadcastChat("player " + player.displayName
+                IemUtils.BroadcastChat("player " + player.displayName
                     + " has joined team " + eventPlayer.eventTeam.TeamName);
 
 
@@ -562,6 +588,21 @@ eventPlayer.player;
         }
 
 
+        public class PlayerInGame : IncursionStateManager.StateBase<PlayerInGame>,
+            IncursionStateManager.IStateMachine
+        {
+            public new void Enter(IncursionStateManager.StateManager psm)
+            {
+                IemUtils.DLog("player is PlayerInGame");
+
+                BasePlayer player = ((PlayerStateManager)psm).
+                eventPlayer.player;
+
+                IncursionUI.CreateAdminBanner2(player, "state:" + psm.GetState().ToString());
+            }
+        }
+
+
         public class PlayerInGameTeamed : IncursionStateManager.StateBase<PlayerInGameTeamed>,
             IncursionStateManager.IStateMachine
         {
@@ -571,6 +612,41 @@ eventPlayer.player;
 
                 BasePlayer player = ((PlayerStateManager)psm).
                 eventPlayer.player;
+
+                IncursionUI.CreateAdminBanner2(player, "state:" + psm.GetState().ToString());
+            }
+        }
+
+        static System.Random rnd = new System.Random();
+
+        static void MovePlayerToEsmLobby(BasePlayer player)
+        {
+            IemUtils.DLog("moving player to esm lobby in IemEventGame");
+
+
+
+            //@todo move this to the game definition
+            Vector3 loc = new Vector3(-236, 3, 18);
+            float radius = 9f;
+            loc = IemUtils.GetRandomPointOnCircle(loc, radius);
+            IemUtils.MovePlayerTo(player, loc);
+            IemUtils.SetMetabolismValues(player);
+        }
+
+        public class PlayerWaiting : IncursionStateManager.StateBase<PlayerWaiting>,
+            IncursionStateManager.IStateMachine
+        {
+            public new void Enter(IncursionStateManager.StateManager psm)
+            {
+                IemUtils.DLog("player is PlayerWaiting");
+
+
+
+                BasePlayer player = ((PlayerStateManager)psm).
+                eventPlayer.player;
+
+                if (!(bool)incursionEventGame.ZoneManager.Call("isPlayerInZone", "lobby", player))
+                    MovePlayerToEsmLobby(player);
 
                 IncursionUI.CreateAdminBanner2(player, "state:" + psm.GetState().ToString());
             }
@@ -610,6 +686,7 @@ eventPlayer.player;
 
         public static EventPlayer GetEventPlayer(BasePlayer player)
         {
+            Plugins.IemUtils.DLog(player.UserIDString);
             EventPlayer eventPlayer
                = player.GetComponent<EventPlayer>();
             if (eventPlayer == null)
@@ -626,9 +703,9 @@ eventPlayer.player;
 
         public class EventTeam
         {
-            public EventTeam(string teamId, 
-                string teamName, 
-                Vector3 teamLocation, 
+            public EventTeam(string teamId,
+                string teamName,
+                Vector3 teamLocation,
                 string colour = "white")
             {
                 TeamId = TeamId;
@@ -641,14 +718,8 @@ eventPlayer.player;
             public string Colour { get; set; }
             public Vector3 Location { get; set; }
             public int Score { get; set; }
-            public Dictionary<string, EventPlayer> teamPlayers 
+            public Dictionary<string, EventPlayer> teamPlayers
                 = new Dictionary<string, EventPlayer>();
-        }
-
-
-        static void BroadcastChat(string message)
-        {
-            incursionEventGame.rust.BroadcastChat(message);
         }
 
         //@todo add checks for game state

@@ -19,6 +19,21 @@ namespace Oxide.Plugins
         void Init()
         {
             iemUtils = this;
+            LogL("");
+            LogL("");
+            LogL("");
+            LogL("Init in iemutils");
+        }
+
+
+        void Loaded()
+        {
+            LogL("iemutils: server loaded");
+        }
+
+        void OnServerInitialized()
+        {
+            LogL("iemutils: server initialized");
         }
 
         #region player modifications
@@ -31,6 +46,8 @@ namespace Oxide.Plugins
             //player.metabolism.health.max = 100;
             player.metabolism.hydration.max = 250;
             player.metabolism.hydration.value = 250;
+
+            
         }
 
 
@@ -46,6 +63,16 @@ namespace Oxide.Plugins
 
         #endregion
 
+
+        void DeleteEverything()
+        {
+            var objects = UnityEngine.Object.FindObjectsOfType<BuildingBlock>();
+            if (objects != null)
+                foreach (var gameObj in objects)
+                    UnityEngine.Object.Destroy(gameObj);
+        }
+
+
         #region Functions
         //from em
         public bool hasAccess(ConsoleSystem.Arg arg)
@@ -58,10 +85,28 @@ namespace Oxide.Plugins
             return true;
         }
 
+        //private bool hasPermission(BasePlayer player, string permname)
+        //{
+        //    return isAdmin(player) || permission.UserHasPermission(player.UserIDString, permname);
+        //}
+
+        public static bool isAdmin(BasePlayer player)
+        {
+            if (player?.net?.connection == null) return true;
+            return player.net.connection.authLevel > 0;
+        }
+
         private string GetMessage(string key) => lang.GetMessage(key, this);
 
         public static void DLog(string message)
         {
+            ConVar.Server.Log("oxide/logs/ESMlog.txt", message);
+            iemUtils.Puts(message);
+        }
+
+        public static void LogL(string message)
+        {
+            ConVar.Server.Log("oxide/logs/Loadlog.txt", message);
             ConVar.Server.Log("oxide/logs/ESMlog.txt", message);
             iemUtils.Puts(message);
         }
@@ -78,6 +123,12 @@ namespace Oxide.Plugins
             }
             else
                 iemUtils.Puts(message);
+        }
+
+
+        public static void BroadcastChat(string message)
+        {
+            iemUtils.rust.BroadcastChat(message);
         }
 
         #endregion
@@ -197,13 +248,15 @@ namespace Oxide.Plugins
             player.SendNetworkUpdateImmediate();
         }
 
+        static Random random = new System.Random();
+
         public static Vector3 GetRandomPointOnCircle(Vector3 centre, float radius)
         {
-            Random random = new System.Random();
+            
             //get a random angli in radians
             float randomAngle = (float)random.NextDouble() * (float)Math.PI * 2.0f;
 
-            //iemUtils.Puts("random angle is " + randomAngle.ToString());
+            DLog("random angle is " + randomAngle.ToString());
 
             Vector3 loc = centre;
 

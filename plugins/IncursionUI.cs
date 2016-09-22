@@ -6,7 +6,7 @@ using Oxide.Game.Rust.Cui;
 namespace Oxide.Plugins
 {
 
-    [Info("Incursion UI", "Tolland", "0.1.0")]
+    [Info("Incursion UI Library", "Tolland", "0.1.0")]
     public class IncursionUI : RustPlugin
     {
 
@@ -20,13 +20,22 @@ namespace Oxide.Plugins
         void Init()
         {
             incursionUI = this;
+            IemUtils.LogL("init complete in IncursionUI");
+        }
+
+        void Loaded()
+        {
+            IemUtils.LogL("server loaded in IncursionUI");
         }
 
         void OnServerInitialized()
         {
             //if the server restarted during a banner, these need to be removed
             IncursionUI.RemoveUIs();
+            IemUtils.LogL("server initialized in IncursionUI");
         }
+
+
 
         public static void RemoveUIs()
         {
@@ -34,24 +43,65 @@ namespace Oxide.Plugins
 
             foreach (BasePlayer player in activePlayers)
             {
-                CuiHelper.DestroyUi(player, "GameBanner");
-                CuiHelper.DestroyUi(player, "adminbannerMessage");
-                CuiHelper.DestroyUi(player, "adminbannerMessage2");
-                CuiHelper.DestroyUi(player, "adminbannerMessage3");
-                CuiHelper.DestroyUi(player, "jailTimer");
-                CuiHelper.DestroyUi(player, "bannerMessage");
-                CuiHelper.DestroyUi(player, "eventmessage");
-                CuiHelper.DestroyUi(player, "team_overlay");
-                CuiHelper.DestroyUi(player, "game_results_overlay");
+                CleanUpGui(player);
             }
         }
 
+        public static void CleanUpGui(BasePlayer player)
+        {
+            CuiHelper.DestroyUi(player, "GameBanner");
+            CuiHelper.DestroyUi(player, "adminbannerMessage");
+            CuiHelper.DestroyUi(player, "adminbannerMessage2");
+            CuiHelper.DestroyUi(player, "adminbannerMessage3");
+            CuiHelper.DestroyUi(player, "jailTimer");
+            CuiHelper.DestroyUi(player, "bannerMessage");
+            CuiHelper.DestroyUi(player, "eventmessage");
+            CuiHelper.DestroyUi(player, "team_overlay");
+            CuiHelper.DestroyUi(player, "game_results_overlay");
+            CuiHelper.DestroyUi(player, "TimerGui");
 
+        }
+
+        public static void ShowCountDownTimerGui(BasePlayer player, string time)
+        {
+            CuiHelper.DestroyUi(player, "TimerGui");
+            var elements = new CuiElementContainer();
+
+            var mainName = elements.Add(new CuiPanel
+            {
+                Image =
+                {
+                    Color = "0.4 0.4 0.4 0.5"
+                },
+                RectTransform =
+                {
+                    AnchorMin = "0 0.925",
+                    AnchorMax = "0.1 1"
+                },
+                CursorEnabled = true
+            }, "Hud", "TimerGui");
+
+            elements.Add(new CuiLabel
+            {
+                Text =
+                {
+                    Text = time,
+                    FontSize = 22,
+                    Align = TextAnchor.MiddleCenter
+                },
+                RectTransform =
+                {
+                    AnchorMin = "0 0",
+                    AnchorMax = "1 1"
+                }
+            }, mainName);
+            CuiHelper.AddUi(player, elements);
+        }
 
         public static void ShowGameBanner(BasePlayer player, List<string> message)
         {
+            CuiHelper.DestroyUi(player, "GameBanner");
             var elements = new CuiElementContainer();
-
             var mainName = elements.Add(new CuiPanel
             {
                 Image =
@@ -525,7 +575,7 @@ namespace Oxide.Plugins
 
             }
 
-            static public void CreateLabel(
+            public static void CreateLabel(
                 ref CuiElementContainer container,
                 string panel,
                 string color,
@@ -610,6 +660,22 @@ namespace Oxide.Plugins
 
         }
 
+        void OnEntityDeath(BaseCombatEntity victim, HitInfo info)
+        {
+            if (victim == null)
+                return;
+
+            if (victim.ToPlayer() != null)
+            {
+                //if (victim.ToPlayer().IsWounded())
+                //   info = TryGetLastWounded(victim.ToPlayer().userID, info);
+
+                CleanUpGui(victim.ToPlayer());
+
+
+            }
+
+        }
 
         #region console control
 
@@ -617,13 +683,7 @@ namespace Oxide.Plugins
         [ConsoleCommand("ui")]
         void ccmdEvent(ConsoleSystem.Arg arg)
         {
-            if (!IemUtils.hasAccess(arg)) return;
-            if (arg.Args == null || arg.Args.Length == 0)
-            {
-                SendReply(arg, "event open - Open a event");
-                SendReply(arg, "event cancel - Cancel a event");
-                return;
-            }
+            //if (!IemUtils.hasAccess(arg)) return;
             switch (arg.Args[0].ToLower())
             {
                 //if there is a EventGame availabe, autostart it
@@ -663,9 +723,17 @@ namespace Oxide.Plugins
                     return;
 
 
+                case "timer":
+                    SendReply(arg, "3");
+                    ShowCountDownTimerGui(arg.Player(), "3 minutes");
+                    return;
+
+
 
             }
         }
         #endregion
+
+
     }
 }

@@ -43,36 +43,8 @@ namespace Oxide.Plugins
         void Init()
         {
             incursionEvents = this;
+            IemUtils.LogL("init  complete in IncursionEvents");
         }
-
-
-
-        class StoredEventPlayer
-        {
-            public string UserId;
-            public string Name;
-
-            public StoredEventPlayer()
-            {
-            }
-
-            public StoredEventPlayer(BasePlayer player)
-            {
-                UserId = player.userID.ToString();
-                Name = player.displayName;
-            }
-        }
-
-        class StoredData
-        {
-            public HashSet<StoredEventPlayer> Players
-                = new HashSet<StoredEventPlayer>();
-
-            public StoredData()
-            {
-            }
-        }
-
 
         StoredData storedData;
 
@@ -84,13 +56,11 @@ namespace Oxide.Plugins
             //Unsubscribe(nameof(OnPlayerAttack));
             //Unsubscribe(nameof(OnItemPickup));
             storedData = Interface.Oxide.DataFileSystem.ReadObject<StoredData>("MyDataFile");
-        }
 
-        void OnRunPlayerMetabolism(PlayerMetabolism m, BaseCombatEntity entity)
-        {
-            var player = entity.ToPlayer();
-            if (player == null) return;
-            IemUtils.SetMetabolismValues(player);
+
+            esm = new EventStateManager(PluginLoaded.Instance);
+
+            IemUtils.LogL("Loaded complete in IncursionEvents");
         }
 
         void OnServerInitialized()
@@ -99,17 +69,26 @@ namespace Oxide.Plugins
             rust.RunServerCommand("weather.rain", "0");
             rust.RunServerCommand("heli.lifetimeminutes", "0");
 
-            esm = new EventStateManager(ServerRunning.Instance);
-
             // the purpose of the event management lobby is for player
             // when there is no game state manager available
             // this is the default esm state until a gamemanager is loaded
             IemUtils.DLog("creating the event management lobby");
             esm.ChangeState(EventManagementLobby.Instance);
+            IemUtils.LogL("OnServerInitialized  complete in IncursionEvents");
+        }
 
 
 
-
+        protected override void LoadDefaultConfig()
+        {
+            PrintWarning("Creating a new configuration file");
+            Config.Clear();
+            Config["EventManagementMode"] = "scheduled";  //{"scheduled","repeating","once","manual"}
+            Config["DefaultGame"] = "Example Team Game";
+            Config["AutoStart"] = true;
+            Config["JoinMessage"] = "Welcome to this server";
+            Config["LeaveMessage"] = "Goodbye";
+            SaveConfig();
         }
 
         static void RunServerCommand(string key, string val)
@@ -121,7 +100,7 @@ namespace Oxide.Plugins
 
         void RepeatGameStub()
         {
-            esm.eg = new IncursionEventGame.EventGame();
+            esm.currentGameStateManager.eg = new IncursionEventGame.EventGame();
             esm.ChangeState(GameLoaded.Instance);
             //probably shouldn't do this.... @todo
             esm.ChangeState(EventLobbyOpen.Instance);
@@ -159,18 +138,32 @@ namespace Oxide.Plugins
         {
             IemUtils.DLog("moving players to esm lobby");
 
-            System.Random rnd = new System.Random();
-
             foreach (BasePlayer player in BasePlayer.activePlayerList)
             {
                 //@todo move this to the game definition
                 Vector3 loc = new Vector3(-236, 3, 18);
-                float radius = 9.5f;
+                float radius = 8.5f;
                 loc = IemUtils.GetRandomPointOnCircle(loc, radius);
                 IemUtils.MovePlayerTo(player, loc);
                 IemUtils.SetMetabolismValues(player);
 
             }
+        }
+
+        System.Random rnd = new System.Random();
+
+        void MovePlayerToEsmLobby(BasePlayer player)
+        {
+            IemUtils.DLog("moving player to esm lobby");
+
+
+
+            //@todo move this to the game definition
+            Vector3 loc = new Vector3(-236, 3, 18);
+            float radius = 8.5f;
+            loc = IemUtils.GetRandomPointOnCircle(loc, radius);
+            IemUtils.MovePlayerTo(player, loc);
+            IemUtils.SetMetabolismValues(player);
         }
 
         void CreateEsmLobby()
@@ -184,15 +177,19 @@ namespace Oxide.Plugins
             IemUtils.DLog("Destroy ESM lobby");
         }
 
+
         void OnEnterZone(string ZoneID, BasePlayer player)
         {
-            IemUtils.DLog(esm.GetState().ToString());
-            if (esm.GetState().Equals(EventLobbyOpen.Instance))
+            if (esm != null)
             {
-                //is this a team zone?
-                if (ZoneID.StartsWith("zone_team_"))
+                IemUtils.DLog(esm.GetState().ToString());
+                if (esm.GetState().Equals(EventLobbyOpen.Instance))
                 {
-                    OnPlayerEnterTeamArea(player, GetTeamFromZone(ZoneID));
+                    //is this a team zone?
+                    if (ZoneID.StartsWith("zone_team_"))
+                    {
+                        OnPlayerEnterTeamArea(player, GetTeamFromZone(ZoneID));
+                    }
                 }
             }
 
@@ -203,12 +200,12 @@ namespace Oxide.Plugins
         IncursionEventGame.EventTeam GetTeamFromZone(string ZoneID)
         {
             IemUtils.DLog("team substring is " + ZoneID.Substring(5));
-            return esm.eg.GetTeamById(ZoneID.Substring(5));
+            return esm.currentGameStateManager.eg.GetTeamById(ZoneID.Substring(5));
         }
 
         void OnPlayerEnterTeamArea(BasePlayer player, IncursionEventGame.EventTeam team)
         {
-            esm.eg.AddPlayerToTeam(player, team);
+            esm.currentGameStateManager.eg.AddPlayerToTeam(player, team);
 
         }
 
@@ -255,14 +252,32 @@ namespace Oxide.Plugins
 
             IncursionEventGame.EventPlayer eventPlayer = IncursionEventGame.GetEventPlayer(player);
 
+            //@todo if this triggers its a bug, seems to happen after dead player reconnects
             if (eventPlayer.psm.eg == null)
             {
                 IemUtils.DLog("event Game was null");
-                if (esm.eg != null)
+                if (esm.currentGameStateManager.eg != null)
                 {
                     IemUtils.DLog("adding eventgame to playerstatemanager");
-                    eventPlayer.psm.eg = esm.eg;
+                    eventPlayer.psm.eg = esm.currentGameStateManager.eg;
                 }
+            }
+
+            //restore the player to the team, @todo fix this crappy hack
+            if (esm.currentGameStateManager.eg.gamePlayers.ContainsKey(player.UserIDString))
+            {
+                if (eventPlayer.eventTeam == null)
+                {
+                    foreach (IncursionEventGame.EventTeam eventTeamsValue 
+                        in esm.currentGameStateManager.eg.eventTeams.Values)
+                    {
+                        if (eventTeamsValue.teamPlayers.ContainsKey(player.UserIDString))
+                        {
+                            eventPlayer.eventTeam = eventTeamsValue;
+                        }
+                    }
+                }
+
             }
 
             if (esm.GetState().Equals(EventManagementLobby.Instance)
@@ -270,8 +285,6 @@ namespace Oxide.Plugins
                 || esm.GetState().Equals(EventLobbyClosed.Instance)
                 )
             {
-                //TeleportPlayerPosition(player, esm.eventLobby.location);
-                Puts("need to teleport player");
                 Puts(eventPlayer.psm.GetState().ToString());
                 if ((bool)ZoneManager.Call("isPlayerInZone", "lobby", player))
                 {
@@ -280,10 +293,26 @@ namespace Oxide.Plugins
                 else
                 {
                     Puts("player not in zone for lobby");
-                    //TeleportPlayerPosition(player, esm.eventLobby.location);
                 }
 
                 eventPlayer.psm.ChangeState(IncursionEventGame.PlayerInEventLobbyNoTeam.Instance);
+            }
+
+            if (esm.GetState().Equals(EventRunning.Instance))
+            {
+                Puts(eventPlayer.psm.GetState().ToString());
+
+                if (esm.currentGameStateManager.eg.gamePlayers.ContainsKey(player.UserIDString))
+                {
+                    esm.currentGameStateManager.eg.MovePlayerToGame(eventPlayer);
+                    eventPlayer.psm.ChangeState(IncursionEventGame.PlayerInGame.Instance);
+                }
+                else
+                {
+                    eventPlayer.psm.ChangeState(IncursionEventGame.PlayerWaiting.Instance);
+                }
+
+
             }
 
         }
@@ -391,11 +420,10 @@ namespace Oxide.Plugins
 
         public class EventStateManager : IncursionStateManager.StateManager
         {
-            public IncursionEventGame.EventGame eg;
             public IncursionHoldingArea.Lobby eventLobby;
             private Dictionary<string, IncursionEventGame.GameStateManager> gameStateManagers
                 = new Dictionary<string, IncursionEventGame.GameStateManager>();
-            private IncursionEventGame.GameStateManager currentGameStateManager;
+            public IncursionEventGame.GameStateManager currentGameStateManager;
 
             public EventStateManager(IncursionStateManager.IStateMachine initialState) : base(initialState)
             {
@@ -405,19 +433,33 @@ namespace Oxide.Plugins
             {
                 gameStateManagers.Add(gameStateManager.Name, gameStateManager);
                 ChangeState(GameLoaded.Instance);
-                eg = gameStateManager.eg;
-                //@todo this is crap. to fix
                 currentGameStateManager = gameStateManager;
             }
 
             public void GameComplete()
             {
                 IemUtils.DLog("game is complete, and event manager has been informed");
-                currentGameStateManager.ChangeState(IemGameTeams.GameUnloaded.Instance);
+                currentGameStateManager.UnloadGame();
+
                 ChangeState(EventManagementLobby.Instance);
                 currentGameStateManager.ReinitializeGame();
-                eg = currentGameStateManager.eg;
                 ChangeState(EventLobbyOpen.Instance);
+            }
+
+            internal void StartScheduledGame()
+            {
+                ChangeState(EventManagementLobby.Instance);
+                currentGameStateManager.ReinitializeGame();
+                ChangeState(EventLobbyOpen.Instance);
+            }
+        }
+
+        public class PluginLoaded : IncursionStateManager.StateBase<PluginLoaded>,
+            IncursionStateManager.IStateMachine
+        {
+            public new void Enter(IncursionStateManager.StateManager esm)
+            {
+                IemUtils.DLog("entry in PluginLoaded");
             }
         }
 
@@ -443,8 +485,6 @@ namespace Oxide.Plugins
                 IncursionHoldingArea.CloseTeamDoors();
 
                 incursionEvents.Subscribe(nameof(OnRunPlayerMetabolism));
-                //incursionEvents.Subscribe(nameof(OnEntityTakeDamage));
-                //Subscribe(nameof(OnPlayerRespawned));
 
                 incursionEvents.MovePlayersToEsmLobby();
 
@@ -463,21 +503,23 @@ namespace Oxide.Plugins
 
         }
 
+
         public class EventLobbyOpen : IncursionStateManager.StateBase<EventLobbyOpen>,
             IncursionStateManager.IStateMachine
         {
-            public new void Enter(IncursionStateManager.StateManager esm)
+            public new void Enter(IncursionStateManager.StateManager sm)
             {
+                EventStateManager esm = ((EventStateManager)sm);
                 IemUtils.DLog("entry into EventLobbyOpen");
                 incursionEvents.Subscribe(nameof(OnRunPlayerMetabolism));
                 IncursionUI.CreateAdminBanner("state:" + esm.GetState().ToString());
                 RunServerCommand("env.time", "12");
-                esm = ((EventStateManager)esm);
+                
                 foreach (BasePlayer player in BasePlayer.activePlayerList)
                 {
                     IncursionEventGame.EventPlayer eventPlayer
-                        = IncursionEventGame.GetEventPlayer(player);
-                    eventPlayer.psm.eg = ((EventStateManager)esm).eg;
+                        = IncursionEventGame.GetEventPlayer(player); 
+                    eventPlayer.psm.eg = esm.currentGameStateManager.eg;
                     eventPlayer.psm.ChangeState(IncursionEventGame.PlayerInEventLobbyNoTeam.Instance);
                 }
                 incursionEvents.rust.BroadcastChat("Opening lobby");
@@ -492,7 +534,7 @@ namespace Oxide.Plugins
                 IemUtils.DLog("executing in EventLobbyOpen");
 
 
-                if (esm.eg.CanGameStart())
+                if (esm.currentGameStateManager.eg.CanGameStart())
                 {
                     IncursionUI.CreateBanner("GAME CAN START");
                     int count = 5;
@@ -505,7 +547,7 @@ namespace Oxide.Plugins
                     {
                         esm.ChangeState(EventLobbyClosed.Instance);
                         esm.ChangeState(EventRunning.Instance);
-                        esm.eg.StartGame();
+                        esm.currentGameStateManager.eg.StartGame();
                         //currentGameStateManager.ReinitializeGame();
                     });
                 }
@@ -516,7 +558,6 @@ namespace Oxide.Plugins
             {
                 IemUtils.DLog("exiting in EventLobbyOpen");
                 IncursionUI.RemoveTeamUI();
-                //IncursionHoldingArea.CloseTeamDoors();
             }
         }
 
@@ -539,7 +580,7 @@ namespace Oxide.Plugins
 
 
 
-        public class EventRunning : IncursionStateManager.StateBase<EventRunning>, 
+        public class EventRunning : IncursionStateManager.StateBase<EventRunning>,
             IncursionStateManager.IStateMachine
         {
             public new void Enter(IncursionStateManager.StateManager esm)
@@ -553,7 +594,6 @@ namespace Oxide.Plugins
             public new void Exit(IncursionStateManager.StateManager esm)
             {
                 IemUtils.DLog("exiting in EventRunning");
-
                 incursionEvents.Subscribe(nameof(OnRunPlayerMetabolism));
             }
         }
@@ -562,6 +602,41 @@ namespace Oxide.Plugins
 
 
 
+        class StoredEventPlayer
+        {
+            public string UserId;
+            public string Name;
+
+            public StoredEventPlayer()
+            {
+            }
+
+            public StoredEventPlayer(BasePlayer player)
+            {
+                UserId = player.userID.ToString();
+                Name = player.displayName;
+            }
+        }
+
+        class StoredData
+        {
+            public HashSet<StoredEventPlayer> Players
+                = new HashSet<StoredEventPlayer>();
+
+            public StoredData()
+            {
+            }
+        }
+
+
+
+        void OnRunPlayerMetabolism(PlayerMetabolism m, BaseCombatEntity entity)
+        {
+            var player = entity.ToPlayer();
+            if (player == null) return;
+            IemUtils.SetMetabolismValues(player);
+        }
+
 
 
         #region chat control
@@ -569,6 +644,7 @@ namespace Oxide.Plugins
         [ChatCommand("Test")]
         void Test(BasePlayer player, string command, string[] args)
         {
+            if (!IemUtils.isAdmin(player)) return;
             var info = new StoredEventPlayer(player);
             //@todo not working... check this
             if (storedData.Players.Contains(info))
@@ -584,6 +660,7 @@ namespace Oxide.Plugins
         [ChatCommand("testmove")]
         private void cmdChatZoneRemove(BasePlayer player, string command, string[] args)
         {
+            if (!IemUtils.isAdmin(player)) return;
             player.MovePosition(new Vector3(-376, 3, 4));
             player.ClientRPCPlayer(null, player, "ForcePositionTo", player.transform.position);
             player.TransformChanged();
@@ -598,17 +675,10 @@ namespace Oxide.Plugins
 
         #region console control
 
-        //from em
         [ConsoleCommand("event")]
         void ccmdEvent(ConsoleSystem.Arg arg)
         {
             if (!IemUtils.hasAccess(arg)) return;
-            if (arg.Args == null || arg.Args.Length == 0)
-            {
-                SendReply(arg, "event open - Open a event");
-                SendReply(arg, "event cancel - Cancel a event");
-                return;
-            }
             switch (arg.Args[0].ToLower())
             {
                 //if there is a EventGame availabe, autostart it
@@ -643,6 +713,11 @@ namespace Oxide.Plugins
                     SendReply(arg, esm.GetState().ToString());
                     SendReply(arg, esm.GetState().GetType().ToString());
                     return;
+                case "closegame":
+                    SendReply(arg, "pausing game");
+                    //PauseGame();
+                    return;
+
 
 
 

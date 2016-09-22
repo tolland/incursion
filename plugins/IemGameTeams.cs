@@ -17,6 +17,9 @@ namespace Oxide.Plugins
         IncursionEvents IncursionEvents;
 
         [PluginReference]
+        IemUtils IemUtils;
+
+        [PluginReference]
         IncursionStateManager IncursionStateManager;
 
         static IemGameTeams iemGameTeams = null;
@@ -24,6 +27,7 @@ namespace Oxide.Plugins
         void Init()
         {
             iemGameTeams = this;
+            IemUtils.LogL("iemGAmeTeams: Init complete");
         }
 
         public IncursionEvents.EventStateManager esm;
@@ -31,7 +35,33 @@ namespace Oxide.Plugins
         void Loaded()
         {
             Unsubscribe(nameof(OnRunPlayerMetabolism));
+            IemUtils.LogL("iemGAmeTeams: Loading started");
+            esm = IncursionEvents.esm;
 
+            //new instance of the Game State manager for this game
+            teamGameStateManager = new TeamGameStateManager(GameCreated.Instance, "Example Team Game");
+
+
+            IemUtils.DLog("loading new gamestatemanager");
+            //load the game to be managed by the state manager
+            teamGameStateManager.eg = new TeamEventGame(teamGameStateManager);
+
+            if(esm==null)
+                IemUtils.DLog("esm is null");
+
+            IemUtils.DLog("calling esm Register game");
+            //tell the event manager about this game
+            esm.RegisterGameStateManager(teamGameStateManager);
+
+            //tell the event manager to open the event lobby with this game loaded
+            //esm.ChangeState(IncursionEvents.EventLobbyOpen.Instance);
+            IemUtils.LogL("iemGAmeTeams: Loaded complete");
+        }
+
+
+        private void OnServerInitialized()
+        {
+            IemUtils.LogL("iemGAmeTeams: OnServerInitialized complete");
         }
 
         void OnRunPlayerMetabolism(PlayerMetabolism m, BaseCombatEntity entity)
@@ -42,27 +72,7 @@ namespace Oxide.Plugins
         }
 
 
-        void OnServerInitialized()
-        {
-
-            IemUtils.DLog(" >>>>>>>starting Game");
-
-            esm = IncursionEvents.esm;
-
-            //new instance of the Game State manager
-            TeamGameStateManager teamGameStateManager
-                = new TeamGameStateManager(GameCreated.Instance, "Example Team Game");
-
-            //load the game details
-            teamGameStateManager.eg = new TeamEventGame(teamGameStateManager);
-
-            //tell the event manager about this game
-            esm.RegisterGameStateManager(teamGameStateManager);
-
-            //tell the event manager to open the event lobby with this game loaded
-            esm.ChangeState(IncursionEvents.EventLobbyOpen.Instance);
-
-        }
+        private TeamGameStateManager teamGameStateManager;
 
         class TeamEventGame : IncursionEventGame.EventGame
         {
@@ -109,6 +119,12 @@ namespace Oxide.Plugins
                 eg = new TeamEventGame(this);
                 ChangeState(GameCreated.Instance);
             }
+
+            public override void UnloadGame()
+            {
+                //eg = new TeamEventGame(this);
+                ChangeState(GameUnloaded.Instance);
+            }
         }
 
         public class GameCreated : IncursionStateManager.StateBase<GameCreated>,
@@ -120,6 +136,7 @@ namespace Oxide.Plugins
                 IncursionUI.CreateAdminBanner3("state:" + gsm.GetState().ToString());
             }
         }
+
 
 
 
@@ -136,13 +153,13 @@ namespace Oxide.Plugins
 
                 foreach (IncursionEventGame.EventPlayer eventPlayer in gsm.eg.gamePlayers.Values)
                 {
-
+                    eventPlayer.psm.ChangeState(IncursionEventGame.PlayerInGame.Instance);
 
                     IncursionUI.ShowGameBanner(eventPlayer.player,
                         ((IncursionEventGame.GameStateManager)gsm).eg.GameIntroBanner);
                 }
 
-                IncursionUI.CreateBanner("GAME CAN START");
+                IncursionUI.CreateBanner("GAME LOBBY");
                 Timer warningTimer = iemGameTeams.timer.Once(2f, () =>
                 {
                     gsm.ChangeState(GameStarted.Instance);
@@ -179,24 +196,20 @@ namespace Oxide.Plugins
                 IemUtils.DLog("entry in Game Started And Open");
                 IncursionUI.CreateAdminBanner3("state:" + gsm.GetState().ToString());
                 iemGameTeams.Subscribe(nameof(OnRunPlayerMetabolism));
-
-                iemGameTeams.rust.BroadcastChat("Game Started And Open");
+                IncursionUI.CreateBanner("GAME STARTED");   
                 if (gsm.eg.TimedGame)
                 {
                     warningTimer = iemGameTeams.timer.Once(gsm.eg.TimeLimit - 10, () =>
                     {
-                        //incursionEvents.EndGameWarning();
                         IncursionUI.CreateBanner("Game ending in 10 seconds - warning");
                     });
                     finalWarningTimer = iemGameTeams.timer.Once(gsm.eg.TimeLimit - 5, () =>
                     {
-                        //incursionEvents.EndGameFinalWarning();
                         IncursionUI.CreateBanner("Game ending in 5 seconds - final warning");
                     });
                     gameTimer = iemGameTeams.timer.Once(gsm.eg.TimeLimit, () =>
                     {
                         gsm.ChangeState(GameComplete.Instance);
-                        //incursionEvents.EndGame();
                     });
                 }
 
@@ -204,6 +217,9 @@ namespace Oxide.Plugins
 
             public new void Exit(IncursionStateManager.StateManager esm)
             {
+                warningTimer.Destroy();
+                finalWarningTimer.Destroy();
+                gameTimer.Destroy();
 
                 iemGameTeams.Unsubscribe(nameof(OnRunPlayerMetabolism));
 
@@ -216,21 +232,21 @@ namespace Oxide.Plugins
             public new void Enter(IncursionStateManager.StateManager sm)
             {
                 iemGameTeams.Subscribe(nameof(OnRunPlayerMetabolism));
+                IncursionUI.CreateBanner("GAME PAUSED");
             }
 
             public new void Exit(IncursionStateManager.StateManager esm)
             {
 
                 iemGameTeams.Unsubscribe(nameof(OnRunPlayerMetabolism));
-
             }
-
-
         }
 
         public class GameComplete : IncursionStateManager.StateBase<GameComplete>,
             IncursionStateManager.IStateMachine
         {
+            private Timer warningTimer;
+
             public new void Enter(IncursionStateManager.StateManager gsm)
             {
                 iemGameTeams.Subscribe(nameof(OnRunPlayerMetabolism));
@@ -238,7 +254,7 @@ namespace Oxide.Plugins
                 IemUtils.DLog("entering in GameComplete");
                 IncursionUI.CreateBanner("Game ended");
                 ((IncursionEventGame.GameStateManager)gsm).eg.ShowGameResultUI();
-                Timer warningTimer = iemGameTeams.timer.Once(10f, () =>
+                warningTimer = iemGameTeams.timer.Once(10f, () =>
                 {
                     IemUtils.DLog("calling game complete on the event manager");
                     iemGameTeams.esm.GameComplete();
@@ -248,6 +264,7 @@ namespace Oxide.Plugins
 
             public new void Exit(IncursionStateManager.StateManager esm)
             {
+                warningTimer.Destroy();
                 IemUtils.DLog("exiting in GameComplete");
                 ((IncursionEventGame.GameStateManager)esm).eg.RemoveGameResultUI();
                 iemGameTeams.Unsubscribe(nameof(OnRunPlayerMetabolism));
@@ -262,16 +279,31 @@ namespace Oxide.Plugins
             {
                 IncursionUI.CreateAdminBanner3("state:" + gsm.GetState().ToString());
                 IemUtils.DLog("entering Game unloaded");
-                //need to clean up game playing field here
-            }
-
-            public new void Exit(IncursionStateManager.StateManager esm)
-            {
-                IemUtils.DLog("exiting in GameUnloaded");
-
+                //@todo need to clean up game playing field here
             }
         }
 
+        //from em
+        [ConsoleCommand("eg")]
+        void ccmdEvent(ConsoleSystem.Arg arg)
+        {
+            
+            if (!IemUtils.hasAccess(arg)) return;
+            switch (arg.Args[0].ToLower())
+            {
+                case "close":
+                    teamGameStateManager.ChangeState(GameComplete.Instance);
+                    return;
+
+                case "open":
+                    esm.ChangeState(IncursionEvents.EventLobbyOpen.Instance);
+                    return;
+
+
+                    
+
+            }
+        }
 
 
     }
