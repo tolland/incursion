@@ -1,0 +1,86 @@
+{
+  "TeamLobbyDoors": [
+    {
+      "position": {
+        "x": -244.249573,
+        "y": 1.900101,
+        "z": 11.5329914,
+        "normalized": {
+          "x": -0.998856962,
+          "y": 0.00777045,
+          "z": 0.04716409,
+          "magnitude": 1.0,
+          "sqrMagnitude": 1.00000012
+        },
+        "magnitude": 244.529083,
+        "sqrMagnitude": 59794.4727
+      },
+      "team": "blue"
+    },
+    {
+      "position": {
+        "x": -242.180908,
+        "y": 1.900101,
+        "z": 9.360382,
+        "normalized": {
+          "x": -0.9992232,
+          "y": 0.00783969648,
+          "z": 0.0386203453,
+          "normalized": {
+            "x": -0.999223232,
+            "y": 0.007839697,
+            "z": 0.03862035,
+            "magnitude": 1.0,
+            "sqrMagnitude": 1.00000012
+          },
+          "magnitude": 0.99999994,
+          "sqrMagnitude": 0.99999994
+        },
+        "magnitude": 242.369186,
+        "sqrMagnitude": 58742.82
+      },
+      "team": "blue"
+    },
+    {
+      "position": {
+        "x": -225.9641,
+        "y": 1.90009952,
+        "z": 24.8011265,
+        "normalized": {
+          "x": -0.993995845,
+          "y": 0.008358368,
+          "z": 0.109097943,
+          "normalized": {
+            "x": -0.9939959,
+            "y": 0.008358369,
+            "z": 0.10909795,
+            "magnitude": 1.0,
+            "sqrMagnitude": 1.00000012
+          },
+          "magnitude": 0.99999994,
+          "sqrMagnitude": 0.99999994
+        },
+        "magnitude": 227.32901,
+        "sqrMagnitude": 51678.48
+      },
+      "team": "red"
+    },
+    {
+      "position": {
+        "x": -228.032776,
+        "y": 1.90009952,
+        "z": 26.9737988,
+        "normalized": {
+          "x": -0.9930424,
+          "y": 0.008274597,
+          "z": 0.117466122,
+          "magnitude": 1.0,
+          "sqrMagnitude": 1.0
+        },
+        "magnitude": 229.630447,
+        "sqrMagnitude": 52730.1445
+      },
+      "team": "red"
+    }
+  ]
+}
