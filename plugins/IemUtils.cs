@@ -146,7 +146,7 @@ namespace Oxide.Plugins
 
         public static void BroadcastChat(string message)
         {
-            iemUtils.rust.BroadcastChat(message);
+            rust.BroadcastChat(message);
         }
 
         #endregion
@@ -313,8 +313,7 @@ namespace Oxide.Plugins
         public static void RunServerCommand(string key, string val)
         {
 
-            iemUtils
-            .rust.RunServerCommand("env.time", "12");
+            rust.RunServerCommand("env.time", "12");
         }
 
         #endregion

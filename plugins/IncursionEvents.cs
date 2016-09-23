@@ -24,21 +24,21 @@ namespace Oxide.Plugins
     public class IncursionEvents : RustPlugin
     {
 
-    	#region Variables
+        #region Variables
 
-		[PluginReference]
+        [PluginReference]
         IncursionEventGame IncursionEventGame;
 
-		[PluginReference]
+        [PluginReference]
         IncursionStateManager IncursionStateManager;
 
-		[PluginReference]
+        [PluginReference]
         IncursionHoldingArea IncursionHoldingArea;
 
-		[PluginReference]
+        [PluginReference]
         IncursionUI IncursionUI;
 
-		[PluginReference]
+        [PluginReference]
         IemUtils IemUtils;
 
         [PluginReference]
@@ -54,10 +54,16 @@ namespace Oxide.Plugins
         }
 
         StoredData storedData;
-        
+
         #endregion
 
         #region Boilerplate
+
+        void Loaded()
+        {
+            esm = new EventStateManager(PluginLoaded.Instance);
+            IemUtils.LogL("IncursionEvents: Loaded complete");
+        }
 
         void Unload()
         {
@@ -695,7 +701,10 @@ namespace Oxide.Plugins
 
             }
 
-			if(esm.IsAny(EventManagementLobby.Instance, EventLobbyOpen.Instance, EventLobbyClosed.Instance))
+
+            if (esm.IsAny(EventManagementLobby.Instance,
+                EventLobbyOpen.Instance,
+                EventLobbyClosed.Instance))
             {
                 Puts(eventPlayer.psm.GetState().ToString());
                 if ((bool)ZoneManager.Call("isPlayerInZone", "lobby", player))
@@ -710,13 +719,12 @@ namespace Oxide.Plugins
                 eventPlayer.psm.ChangeState(IncursionEventGame.PlayerInEventLobbyNoTeam.Instance);
             }
 
-			if(esm.IsAny(GameStartedAndOpen.Instance, GameStartedAndClosed.Instance, GameStartedAndPaused.Instance))
+            if (esm.IsAny(EventRunning.Instance))
             {
                 Puts(eventPlayer.psm.GetState().ToString());
 
                 if (esm.currentGameStateManager.eg.gamePlayers.ContainsKey(player.UserIDString))
                 {
-            	IemUtils.MovePlayerTo(player, eventPlayer.eventTeam.Location);
                     esm.currentGameStateManager.eg.MovePlayerToGame(eventPlayer);
                     eventPlayer.psm.ChangeState(IncursionEventGame.PlayerInGame.Instance);
                 }
@@ -727,6 +735,8 @@ namespace Oxide.Plugins
 
 
             }
+
+
 
         }
 
@@ -773,7 +783,7 @@ namespace Oxide.Plugins
 
         BasePlayer.SpawnPoint OnFindSpawnPoint()
         {
-			if(esm.IsAny(EventManagementLobby.Instance, EventLobbyOpen.Instance, EventLobbyClosed.Instance))
+            if (esm.IsAny(EventManagementLobby.Instance, EventLobbyOpen.Instance, EventLobbyClosed.Instance))
             {
                 //@todo move this code
                 vectorUp = new Vector3(0f, Convert.ToSingle(CheckUp), 0f);
@@ -845,7 +855,6 @@ namespace Oxide.Plugins
         //{
         //    Puts("CanEquipItem works!");
         //}
-			if(esm.IsAny(EventManagementLobby.Instance, EventLobbyOpen.Instance, EventLobbyClosed.Instance))
 
         //void CanWearItem(PlayerInventory inventory, Item item)
         //{

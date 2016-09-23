@@ -59,17 +59,19 @@ namespace Oxide.Plugins
             //tell the event manager about this game
             esm.RegisterGameStateManager(teamGameStateManager);
 
+
             //load the game to be managed by the state manager
             teamGameStateManager.eg = new TeamEventGame(teamGameStateManager);
             teamGameStateManager.ChangeState(GameEventLoaded.Instance);
 
             //tell the Esm to check whether to update the lobby
-            IemUtils.DLog("esm state is "+esm.GetState());
+            IemUtils.DLog("esm state is " + esm.GetState());
             esm.Update();
 
             IemUtils.LogL("iemGameTeams: Loaded complete");
         }
-       
+
+
 
         private void OnServerInitialized()
         {
@@ -237,7 +239,6 @@ namespace Oxide.Plugins
                 }
             }
         }
-
 
 
         /// <summary>

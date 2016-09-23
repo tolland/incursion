@@ -18,8 +18,7 @@ namespace Oxide.Plugins
 
         [PluginReference]
         Plugin ZoneManager;
-
-		[PluginReference]
+        
         [PluginReference]
         IemUtils IemUtils;
         
@@ -193,7 +192,7 @@ namespace Oxide.Plugins
         static void CreateZonesForArenas(Vector3 location)
         {
             //  Puts("");
-            //Puts(" >>>>>createArenaZones");
+            //Puts(" >>>>>createArenaZones");s
             IemUtils.CreateZone("team_1", new Vector3(-255, 2, -1), 5);
             IemUtils.CreateZone("team_2", new Vector3(-214, 2, 38), 5);
             IemUtils.CreateZone("team_4", new Vector3(-262, 2, 26), 5);
@@ -462,7 +461,7 @@ namespace Oxide.Plugins
 
         void Unloaded()
         {
-            SaveData();
+           // SaveData();
         }
 
         void SaveData()
@@ -535,7 +534,6 @@ namespace Oxide.Plugins
 
 
             }
-
 
 
         }
