@@ -22,7 +22,8 @@ namespace Oxide.Plugins
 
         public class StateManager
         {
-            IStateMachine currentState;
+            IStateMachine currentState = null;
+            IStateMachine previousState = null;
 
             public StateManager(IStateMachine initialState)
             {
@@ -45,14 +46,44 @@ namespace Oxide.Plugins
                 currentState.Execute(this);
             }
 
-            public void ChangeState(IStateMachine newState)
+            public virtual void ChangeState(IStateMachine newState)
             {
-                //probably want to throw exception instead
+                //@todo probably want to throw exception instead
                 if ((currentState == null) || (newState == null))
                     return;
+                IemUtils.SLog("stateManager:"+ this.GetType().Name);
+                IemUtils.SLog("StateManager:ChangeState:oldstate:" + currentState);
+                IemUtils.SLog("StateManager:ChangeState:newstate:" + newState);
+
                 currentState.Exit(this);
+                previousState = currentState;
                 currentState = newState;
                 currentState.Enter(this);
+            }
+
+            /// <summary>
+            /// enter a substate, where you want to revert to the previous state
+            /// </summary>
+            /// <param name="newState"></param>
+            public virtual void SubState(IStateMachine newState)
+            {
+                if ((previousState == null) || (newState == null))
+                    return;
+                IemUtils.SLog("stateManager:" + this.GetType().Name);
+                IemUtils.SLog("StateManager:ChangeState:PrevState:" + currentState);
+                IemUtils.SLog("StateManager:ChangeState:newstate:" + newState);
+                previousState = currentState;
+                currentState = newState;
+                currentState.Enter(this);
+            }
+
+            public virtual void SubStateReturn()
+            {
+                IemUtils.SLog("stateManager:" + this.GetType().Name);
+                IemUtils.SLog("StateManager:ChangeState:PrevState:" + currentState);
+                IemUtils.SLog("StateManager:ChangeState:Reverting:" + previousState);
+                currentState.Exit(this);
+                currentState = previousState;
             }
 
             public IStateMachine GetState()
@@ -81,7 +112,7 @@ namespace Oxide.Plugins
                 get { return _instance; }
             }
 
-            public void Enter(StateManager psm)
+            public virtual void Enter(StateManager psm)
             {
                 DLog("Entering the " + typeof(T));
             }

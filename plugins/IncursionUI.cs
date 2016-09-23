@@ -2,10 +2,14 @@
 using UnityEngine;
 using System.Collections.Generic;
 using Oxide.Game.Rust.Cui;
+using System;
 
 namespace Oxide.Plugins
 {
-
+    /// <summary>
+    /// This is all dreadful rubbish.</summary>
+    /// <remarks>
+    /// </remarks>
     [Info("Incursion UI Library", "Tolland", "0.1.0")]
     public class IncursionUI : RustPlugin
     {
@@ -20,19 +24,25 @@ namespace Oxide.Plugins
         void Init()
         {
             incursionUI = this;
-            IemUtils.LogL("init complete in IncursionUI");
+            IemUtils.LogL("IncursionUI: init complete");
         }
 
         void Loaded()
         {
-            IemUtils.LogL("server loaded in IncursionUI");
+            IemUtils.LogL("IncursionUI: Loaded complete");
+        }
+
+        void Unload()
+        {
+            IemUtils.LogL("IncursionUI: Unload complete");
+
         }
 
         void OnServerInitialized()
         {
             //if the server restarted during a banner, these need to be removed
             IncursionUI.RemoveUIs();
-            IemUtils.LogL("server initialized in IncursionUI");
+            IemUtils.LogL("IncursionUI: on server initialized");
         }
 
 
@@ -59,7 +69,11 @@ namespace Oxide.Plugins
             CuiHelper.DestroyUi(player, "team_overlay");
             CuiHelper.DestroyUi(player, "game_results_overlay");
             CuiHelper.DestroyUi(player, "TimerGui");
-
+            CuiHelper.DestroyUi(player, "DisplayEnterLobbyUIHeader");
+            CuiHelper.DestroyUi(player, "CreateEventBanner");
+            CuiHelper.DestroyUi(player, "CreatGameBanner");
+            CuiHelper.DestroyUi(player, "CreateBanner");
+            
         }
 
         public static void ShowCountDownTimerGui(BasePlayer player, string time)
@@ -179,6 +193,48 @@ namespace Oxide.Plugins
                     false);
                 UI.CreateLabel(ref container, "bannerMessage", "",
                     $"{ARENA}", 18, "0 0", "1 1");
+                CuiHelper.AddUi(player, container);
+            }
+        }
+
+        public static void CreateGameBanner(string message)
+        {
+            string ARENA = $"{message}";
+
+            List<BasePlayer> activePlayers = BasePlayer.activePlayerList;
+
+            foreach (BasePlayer player in activePlayers)
+            {
+                CuiHelper.DestroyUi(player, "CreateGameBanner");
+                var container = UI.CreateElementContainer(
+                    "CreateGameBanner",
+                    "0.3 0.3 0.3 0.6",
+                    "0.22 0.945",
+                    "0.78 0.995",
+                    false);
+                UI.CreateLabel(ref container, "CreateGameBanner", "",
+                    $"{ARENA}", 16, "0 0", "1 0.5");
+                CuiHelper.AddUi(player, container);
+            }
+        }
+
+        public static void CreateEventBanner(string message)
+        {
+            string ARENA = $"{message}";
+
+            List<BasePlayer> activePlayers = BasePlayer.activePlayerList;
+
+            foreach (BasePlayer player in activePlayers)
+            {
+                CuiHelper.DestroyUi(player, "CreateEventBanner");
+                var container = UI.CreateElementContainer(
+                    "CreateEventBanner",
+                    "0.3 0.3 0.3 0.6",
+                    "0.22 0.945",
+                    "0.78 0.995",
+                    false);
+                UI.CreateLabel(ref container, "CreateEventBanner", "",
+                    $"{ARENA}", 16, "0 0.5", "1 1");
                 CuiHelper.AddUi(player, container);
             }
         }
@@ -355,34 +411,6 @@ namespace Oxide.Plugins
 
                 teamSlot++;
             }
-
-            //UI.CreateButton(ref container, "game_results_overlay", "",
-            //   "I agree",
-            //    22,
-            //    "0.4 0.16",
-            //    "0.6 0.2",
-            //    TextAnchor.LowerCenter);
-
-            //elements.Add(new CuiButton
-            //{
-            //    Button =
-            //    {
-            //        Close = mainName,
-            //        Color = "0 255 0 1"
-            //    },
-            //    RectTransform =
-            //    {
-            //        AnchorMin = "0.4 0.16",
-            //        AnchorMax = "0.6 0.2"
-            //    },
-            //    Text =
-            //    {
-            //        Text = "I Agree",
-            //        FontSize = 22,
-            //        Align = TextAnchor.MiddleCenter
-            //    }
-            //}, mainName); ;
-
             CuiHelper.AddUi(player, container);
 
         }
@@ -402,13 +430,17 @@ namespace Oxide.Plugins
             public string TeamName { get; set; }
             public string Color { get; set; }
             public List<string> Players;
+            public string JoinCommand { get; set; }
+            public bool TeamOpen { get; set; }
+
 
             public UiTeam(string teamName, List<string> players, string color)
             {
                 TeamName = teamName;
                 Players = players;
                 Color = color;
-
+                TeamOpen = true;
+                JoinCommand = "";
             }
         }
 
@@ -638,6 +670,7 @@ namespace Oxide.Plugins
 
             }
 
+
             static public void CreateButton(
                 ref CuiElementContainer container,
                 string panel,
@@ -675,6 +708,350 @@ namespace Oxide.Plugins
 
             }
 
+        }
+
+
+
+        public static void DisplayEnterLobbyUI(BasePlayer player)
+        {
+            if (player.HasPlayerFlag(BasePlayer.PlayerFlags.ReceivingSnapshot))
+            {
+                incursionUI.timer.In(1, () => DisplayEnterLobbyUI(player));
+            }
+            else
+            {
+                string steamId = Convert.ToString(player.userID);
+                //display on every connect
+                if (true)
+                {
+                    string msg = "<color>some stuff here</color>";
+
+                    UseDisplayEnterLobbyUI(player, msg.ToString());
+                }
+            }
+        }
+
+        public static void DisplayEnterLobbyUIHeader(BasePlayer player)
+        {
+            var elements = new CuiElementContainer();
+
+            var mainName = elements.Add(new CuiPanel
+            {
+                Image =
+                {
+                    Color = "0.1 0.1 0.1 1"
+                },
+                RectTransform =
+                {
+                    AnchorMin = "0 0.8",
+                    AnchorMax = "1 1"
+                },
+                CursorEnabled = true
+            }, "Overlay", "DisplayEnterLobbyUIHeader");
+            elements.Add(new CuiLabel
+            {
+                Text =
+                {
+                    Text = "Welcome to Incursion!",
+                    FontSize = 22,
+                    Align = TextAnchor.MiddleCenter
+                },
+                RectTransform =
+                {
+                    AnchorMin = "0 0.20",
+                    AnchorMax = "1 0.9"
+                }
+            }, mainName);
+            CuiHelper.AddUi(player, elements);
+        }
+
+
+        public static void DisplayEnterLobbyUIOpenLobby(BasePlayer player)
+        {
+            var elements = new CuiElementContainer();
+
+            var mainName = elements.Add(new CuiPanel
+            {
+                Image =
+                {
+                    Color = "0.1 0.1 0.1 1"
+                },
+                RectTransform =
+                {
+                    AnchorMin = "0 0.4",
+                    AnchorMax = "1 0.8"
+                },
+                CursorEnabled = true
+            }, "Overlay", "DisplayEnterLobbyUIOpenLobby");
+            elements.Add(new CuiLabel
+            {
+                Text =
+                {
+                    Text = "Event Lobby Open Messages",
+                    FontSize = 22,
+                    Align = TextAnchor.MiddleCenter
+                },
+                RectTransform =
+                {
+                    AnchorMin = "0 0.20",
+                    AnchorMax = "1 0.9"
+                }
+            }, mainName);
+            var BlueTeam = new CuiButton
+            {
+                Button =
+                {
+                    Command = "global.event joinblueteam",
+                    Close = mainName,
+                    Color = "0 0 255 1"
+                },
+                RectTransform =
+                {
+                    AnchorMin = "0.5 0.26",
+                    AnchorMax = "0.75 0.3"
+                },
+                Text =
+                {
+                    Text = "Blue Team",
+                    FontSize = 22,
+                    Align = TextAnchor.MiddleCenter
+                }
+            };
+            var RedTeam = new CuiButton
+            {
+                Button =
+                {
+                    Command = "global.event joinredteam",
+                    Close = mainName,
+                    Color = "255 0 0 1"
+                },
+                RectTransform =
+                {
+                    AnchorMin = "0.5 0.3",
+                    AnchorMax = "0.75 0.34"
+                },
+                Text =
+                {
+                    Text = "Red Team",
+                    FontSize = 22,
+                    Align = TextAnchor.MiddleCenter
+                }
+            };
+            var RandomTeam = new CuiButton
+            {
+                Button =
+                {
+                    Command = "global.event joinrandomteam",
+                    Close = mainName,
+                    Color = "0.5 0.5 0.5 1"
+                },
+                RectTransform =
+                {
+                    AnchorMin = "0.5 0.16",
+                    AnchorMax = "0.75 0.2"
+                },
+                Text =
+                {
+                    Text = "Join Random Team",
+                    FontSize = 22,
+                    Align = TextAnchor.MiddleCenter
+                }
+            };
+            elements.Add(RedTeam, mainName);
+            elements.Add(BlueTeam, mainName);
+            elements.Add(RandomTeam, mainName);
+            CuiHelper.AddUi(player, elements);
+        }
+
+        public class ScheduledEventUiObject
+        {
+            List<UiTeam> teams = new List<UiTeam>();
+            private DateTime startTime { get; set; }
+            private int Length { get; set; }
+
+            public ScheduledEventUiObject()
+            {
+                
+            }
+
+        }
+
+        public static void DisplayEnterLobbyUIScheduled(BasePlayer player, IemUtils.ScheduledEvent sevent)
+        {
+
+            var elements = new CuiElementContainer();
+
+            var mainName = elements.Add(new CuiPanel
+            {
+                Image =
+                {
+                    Color = "0.1 0.1 0.1 1"
+                },
+                RectTransform =
+                {
+                    AnchorMin = "0 0.0",
+                    AnchorMax = "1 0.4"
+                },
+                CursorEnabled = true
+            }, "Overlay", "DisplayEnterLobbyUIScheduled");
+
+            elements.Add(new CuiLabel
+            {
+                Text =
+                {
+                    Text = "Next Scheduled event!",
+                    FontSize = 22,
+                    Align = TextAnchor.MiddleCenter
+                },
+                RectTransform =
+                {
+                    AnchorMin = "0 0.80",
+                    AnchorMax = "1 1.0"
+                }
+            }, mainName);
+
+            foreach (var team in sevent.seTeam)
+            {
+                Plugins.IemUtils.DLog("team is " + team.TeamName);
+                elements.Add(new CuiButton
+                {
+                    Button =
+                {
+                    Command = team.JoinCommand,
+                    Color = "0 255 0 1"
+                },
+                    RectTransform =
+                {
+                    AnchorMin = "0 0",
+                    AnchorMax = "1 0.5"
+                },
+                    Text =
+                {
+                    Text = team.TeamName,
+                    FontSize = 22,
+                    Align = TextAnchor.MiddleCenter
+                }
+                }, mainName);
+            }
+
+            CuiHelper.AddUi(player, elements);
+        }
+
+        public static void UseDisplayEnterLobbyUI(BasePlayer player, string msg)
+        {
+            var elements = new CuiElementContainer();
+
+            var mainName = elements.Add(new CuiPanel
+            {
+                Image =
+                {
+                    Color = "0.1 0.1 0.1 1"
+                },
+                RectTransform =
+                {
+                    AnchorMin = "0 0",
+                    AnchorMax = "1 1"
+                },
+                CursorEnabled = true
+            }, "Overlay", "EventSelectGUI");
+            var Agree = new CuiButton
+            {
+                Button =
+                {
+                    Close = mainName,
+                    Color = "0 255 0 1"
+                },
+                RectTransform =
+                {
+                    AnchorMin = "0.2 0.16",
+                    AnchorMax = "0.35 0.2"
+                },
+                Text =
+                {
+                    Text = "I Agree",
+                    FontSize = 22,
+                    Align = TextAnchor.MiddleCenter
+                }
+            };
+            var BlueTeam = new CuiButton
+            {
+                Button =
+                {
+                    Command = "global.event joinblueteam",
+                    Close = mainName,
+                    Color = "0 0 255 1"
+                },
+                RectTransform =
+                {
+                    AnchorMin = "0.5 0.26",
+                    AnchorMax = "0.75 0.3"
+                },
+                Text =
+                {
+                    Text = "Blue Team",
+                    FontSize = 22,
+                    Align = TextAnchor.MiddleCenter
+                }
+            };
+            var RedTeam = new CuiButton
+            {
+                Button =
+                {
+                    Command = "global.event joinredteam",
+                    Close = mainName,
+                    Color = "255 0 0 1"
+                },
+                RectTransform =
+                {
+                    AnchorMin = "0.5 0.3",
+                    AnchorMax = "0.75 0.34"
+                },
+                Text =
+                {
+                    Text = "Red Team",
+                    FontSize = 22,
+                    Align = TextAnchor.MiddleCenter
+                }
+            };
+            var RandomTeam = new CuiButton
+            {
+                Button =
+                {
+                    Command = "global.event joinrandomteam",
+                    Close = mainName,
+                    Color = "0.5 0.5 0.5 1"
+                },
+                RectTransform =
+                {
+                    AnchorMin = "0.5 0.16",
+                    AnchorMax = "0.75 0.2"
+                },
+                Text =
+                {
+                    Text = "Join Random Team",
+                    FontSize = 22,
+                    Align = TextAnchor.MiddleCenter
+                }
+            };
+            elements.Add(new CuiLabel
+            {
+                Text =
+                {
+                    Text = msg,
+                    FontSize = 22,
+                    Align = TextAnchor.MiddleCenter
+                },
+                RectTransform =
+                {
+                    AnchorMin = "0 0.20",
+                    AnchorMax = "1 0.9"
+                }
+            }, mainName);
+            elements.Add(Agree, mainName);
+            elements.Add(RedTeam, mainName);
+            elements.Add(BlueTeam, mainName);
+            elements.Add(RandomTeam, mainName);
+            CuiHelper.AddUi(player, elements);
         }
 
         #region console control
@@ -726,6 +1103,10 @@ namespace Oxide.Plugins
                 case "timer":
                     SendReply(arg, "3");
                     ShowCountDownTimerGui(arg.Player(), "3 minutes");
+                    return;
+                case "removehud":
+                    SendReply(arg, "3");
+                    CuiHelper.DestroyUi(arg.Player(), "DisplayEnterLobbyUIScheduled");
                     return;
 
 

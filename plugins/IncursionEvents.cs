@@ -3,15 +3,19 @@
 //Requires: IncursionUI
 //Requires: IncursionStateManager
 //Requires: IemUtils
+using Oxide.Ext.MySql;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using ConVar;
 using UnityEngine;
 using Oxide.Core;
 using Oxide.Core.Plugins;
 using Steamworks;
+using Oxide.Core.Database;
 using Physics = UnityEngine.Physics;
 using Random = System.Random;
+using Oxide.Game.Rust.Cui;
 
 namespace Oxide.Plugins
 {
@@ -43,38 +47,28 @@ namespace Oxide.Plugins
         void Init()
         {
             incursionEvents = this;
-            IemUtils.LogL("init  complete in IncursionEvents");
+            IemUtils.LogL("IncursionEvents: init complete");
         }
 
         StoredData storedData;
 
         void Loaded()
         {
-            Unsubscribe(nameof(OnRunPlayerMetabolism));
-            //Unsubscribe(nameof(OnEntityTakeDamage));
-            //Unsubscribe(nameof(OnPlayerRespawned));
-            //Unsubscribe(nameof(OnPlayerAttack));
-            //Unsubscribe(nameof(OnItemPickup));
-            storedData = Interface.Oxide.DataFileSystem.ReadObject<StoredData>("MyDataFile");
-
-
             esm = new EventStateManager(PluginLoaded.Instance);
+            IemUtils.LogL("IncursionEvents: Loaded complete");
+        }
 
-            IemUtils.LogL("Loaded complete in IncursionEvents");
+        void Unload()
+        {
+            esm = new EventStateManager(PluginUnload.Instance);
+            IemUtils.LogL("IncursionEvents: Unload complete");
         }
 
         void OnServerInitialized()
         {
-            rust.RunServerCommand("weather.fog", "0");
-            rust.RunServerCommand("weather.rain", "0");
-            rust.RunServerCommand("heli.lifetimeminutes", "0");
-
-            // the purpose of the event management lobby is for player
-            // when there is no game state manager available
-            // this is the default esm state until a gamemanager is loaded
-            IemUtils.DLog("creating the event management lobby");
-            esm.ChangeState(EventManagementLobby.Instance);
-            IemUtils.LogL("OnServerInitialized  complete in IncursionEvents");
+            esm.ChangeState(ServerInitialized.Instance);
+            esm.Update();
+            IemUtils.LogL("IncursionEvents: OnServerInitialized complete");
         }
 
 
@@ -83,7 +77,8 @@ namespace Oxide.Plugins
         {
             PrintWarning("Creating a new configuration file");
             Config.Clear();
-            Config["EventManagementMode"] = "scheduled";  //{"scheduled","repeating","once","manual"}
+            Config["EventManagementMode"] = "repeating";  //{"scheduled","repeating","once","manual"}
+            Config["SchedulerEnabled"] = false;
             Config["DefaultGame"] = "Example Team Game";
             Config["AutoStart"] = true;
             Config["JoinMessage"] = "Welcome to this server";
@@ -91,49 +86,8 @@ namespace Oxide.Plugins
             SaveConfig();
         }
 
-        static void RunServerCommand(string key, string val)
-        {
-
-            incursionEvents
-            .rust.RunServerCommand("env.time", "12");
-        }
-
-        void RepeatGameStub()
-        {
-            esm.currentGameStateManager.eg = new IncursionEventGame.EventGame();
-            esm.ChangeState(GameLoaded.Instance);
-            //probably shouldn't do this.... @todo
-            esm.ChangeState(EventLobbyOpen.Instance);
-        }
-
-        void OpenEvent()
-        {
-            esm.ChangeState(EventLobbyOpen.Instance);
-        }
-
-        void CloseEvent()
-        {
-            esm.ChangeState(EventLobbyClosed.Instance);
-        }
-
-
-
-        void EndGameWarning()
-        {
-            rust.BroadcastChat("end game warning");
-        }
-
-        void EndGameFinalWarning()
-        {
-            rust.BroadcastChat("end game final warning");
-        }
-
-
-
         ///This section is private methods for ESM
         /// 
-
-
         void MovePlayersToEsmLobby()
         {
             IemUtils.DLog("moving players to esm lobby");
@@ -178,6 +132,463 @@ namespace Oxide.Plugins
         }
 
 
+
+
+
+        public class EventStateManager : IncursionStateManager.StateManager
+        {
+            public IncursionHoldingArea.Lobby eventLobby;
+            public Dictionary<string, IncursionEventGame.GameStateManager> gameStateManagers
+                = new Dictionary<string, IncursionEventGame.GameStateManager>();
+            public IncursionEventGame.GameStateManager currentGameStateManager;
+
+            public EventStateManager(IncursionStateManager.IStateMachine initialState) : base(initialState)
+            {
+            }
+
+            public override void ChangeState(IncursionStateManager.IStateMachine newState)
+            {
+                base.ChangeState(newState);
+                IemUtils.DDLog("changing state in EventStateManager");
+                IncursionUI.CreateAdminBanner("state:" + GetState().ToString());
+
+            }
+
+            public void RegisterGameStateManager(IncursionEventGame.GameStateManager gameStateManager)
+            {
+                gameStateManagers.Add(gameStateManager.Name, gameStateManager);
+                //currentGameStateManager = gameStateManager;
+            }
+
+            public void GameComplete()
+            {
+
+                //ChangeState(EventManagementLobby.Instance);
+            }
+
+            internal void StartScheduledGame(IemUtils.ScheduledEvent sevent)
+            {
+
+                if (GetState() == EventManagementLobby.Instance)
+                {
+                    currentGameStateManager.ReinitializeGame();
+                    currentGameStateManager.nextEvent = sevent;
+
+                    ChangeState(EventManagementLobby.Instance);
+                }
+                else
+                {
+                    throw new Exception("can't start schedled game, not in EventManagementLobby");
+                }
+
+
+            }
+        }
+
+        #region event manager states
+
+        /// <summary>
+        /// This state represents when the IncursionEvents plugin is loaded
+        /// but before any Game has been loaded
+        /// </summary>
+        public class PluginLoaded : IncursionStateManager.StateBase<PluginLoaded>,
+            IncursionStateManager.IStateMachine
+        {
+            public new void Enter(IncursionStateManager.StateManager esm)
+            {
+                //unsubscribe from events until correct state
+                //this is the entrypoint for the statemanager
+                incursionEvents.Unsubscribe(nameof(OnRunPlayerMetabolism));
+
+                incursionEvents.storedData = Interface.Oxide.DataFileSystem.ReadObject<StoredData>("MyDataFile");
+            }
+        }
+
+        /// <summary>
+        /// This state represents when the IncursionEvents plugin is PluginUnload
+        /// implicit event triggered by Unload hook
+        /// </summary>
+        public class PluginUnload : IncursionStateManager.StateBase<PluginUnload>,
+            IncursionStateManager.IStateMachine
+        {
+            public new void Enter(IncursionStateManager.StateManager esm)
+            {
+            }
+        }
+
+        public class ServerRunning : IncursionStateManager.StateBase<ServerRunning>,
+            IncursionStateManager.IStateMachine
+        {
+            public new void Enter(IncursionStateManager.StateManager esm)
+            {
+                IemUtils.DLog("entry in ServerRunning");
+            }
+        }
+
+
+        public class ServerInitialized : IncursionStateManager.StateBase<ServerInitialized>,
+            IncursionStateManager.IStateMachine
+        {
+            public new void Enter(IncursionStateManager.StateManager esm)
+            {
+                incursionEvents.rust.RunServerCommand("weather.fog", "0");
+                incursionEvents.rust.RunServerCommand("weather.rain", "0");
+                incursionEvents.rust.RunServerCommand("heli.lifetimeminutes", "0");
+
+            }
+
+            public new void Execute(IncursionStateManager.StateManager esm)
+            {
+                //there are no checks to do to proceed to the event management lobby
+                esm.ChangeState(EventManagementLobby.Instance);
+            }
+
+
+        }
+
+
+
+
+
+        /// <summary>
+        /// In this state, the players are moved to the event lobby
+        /// however the players cannot yet select teams
+        /// </summary>
+        public class EventManagementLobby : IncursionStateManager.StateBase<EventManagementLobby>,
+            IncursionStateManager.IStateMachine
+        {
+            private Timer daytime = null;
+            public new void Enter(IncursionStateManager.StateManager esm)
+            {
+                incursionEvents.ResetPlayerStatuses();
+                incursionEvents.CreateEsmLobby();
+                IncursionHoldingArea.CloseTeamDoors();
+
+                incursionEvents.Subscribe(nameof(OnRunPlayerMetabolism));
+
+                incursionEvents.MovePlayersToEsmLobby();
+                daytime = incursionEvents.timer.Once(120f, () => SetLobbyEnvironment());
+
+            }
+
+            private void SetLobbyEnvironment()
+            {
+                IemUtils.RunServerCommand("env.time", "12");
+                daytime = incursionEvents.timer.Once(120f, () => SetLobbyEnvironment());
+            }
+
+            public new void Execute(IncursionStateManager.StateManager sm)
+            {
+
+                //work with the child class methods
+                EventStateManager esm = ((EventStateManager)sm);
+
+                Plugins.IemUtils.DLog("executing in event lobby before game");
+
+                switch ((string)incursionEvents.Config["EventManagementMode"])
+                {
+                    // make the gsm available and open the event lobby
+                    case "repeating":
+                        if ((bool)incursionEvents.Config["AutoStart"] == true)
+                        {
+                            esm.currentGameStateManager = esm.gameStateManagers.First().Value;
+                            esm.ChangeState(EventLobbyOpen.Instance);
+                            esm.Update();
+                        }
+                        break;
+                    case "once":
+                        if ((bool)incursionEvents.Config["AutoStart"] == true)
+                        {
+                            esm.currentGameStateManager = esm.gameStateManagers.First().Value;
+                            esm.ChangeState(EventLobbyOpen.Instance);
+                            esm.Update();
+                        }
+                        break;
+
+                    //gsm will be initialized by the scheduler
+                    case "scheduled":
+                        //esm.currentGameStateManager = esm.gameStateManagers.First().Value;
+                        //
+
+                        break;
+                }
+
+
+            }
+
+            public new void Exit(IncursionStateManager.StateManager esm)
+            {
+                daytime?.Destroy();
+                incursionEvents.Unsubscribe(nameof(OnRunPlayerMetabolism));
+            }
+
+        }
+
+        /// <summary>
+        /// a playable game has been loaded, but the lobby is not open to players
+        /// </summary>
+        public class GameLoaded : IncursionStateManager.StateBase<GameLoaded>,
+            IncursionStateManager.IStateMachine
+        {
+
+        }
+
+
+
+        /// <summary>
+        /// players can join teams
+        /// there should be a game state manager registered, and an eventgame available
+        /// to enter in here
+        /// </summary>
+        public class EventLobbyOpen : IncursionStateManager.StateBase<EventLobbyOpen>,
+            IncursionStateManager.IStateMachine
+        {
+            public new void Enter(IncursionStateManager.StateManager sm)
+            {
+                //work with the child class methods
+                EventStateManager esm = ((EventStateManager)sm);
+
+                //protect players from metabolism when in lobby
+                incursionEvents.Subscribe(nameof(OnRunPlayerMetabolism));
+
+                //@todo create a general function for lobby environment settings
+                IemUtils.RunServerCommand("env.time", "12");
+
+                //if players/teams exist in the scheduled event, move them to the event game
+                //incursionEvents.ProcessScheduledEventToEventGame();
+
+                foreach (BasePlayer player in BasePlayer.activePlayerList)
+                {
+
+                    IncursionEventGame.EventPlayer eventPlayer
+                        = IncursionEventGame.GetEventPlayer(player);
+
+                    eventPlayer.psm.eg = esm.currentGameStateManager.eg;
+
+                    eventPlayer.psm.ChangeState(IncursionEventGame.PlayerInEventLobbyNoTeam.Instance);
+                }
+                incursionEvents.rust.BroadcastChat("Opening lobby");
+                IncursionHoldingArea.OpenTeamDoors();
+
+            }
+
+            /// <summary>
+            /// this method is called by events which might require the event manager
+            /// to update the lobby, ie players joining teams
+            /// </summary>
+            /// <param name="sm"></param>
+            public new void Execute(IncursionStateManager.StateManager sm)
+            {
+
+                EventStateManager esm = (EventStateManager)sm;
+
+                esm.currentGameStateManager.Update();
+
+                //if (esm.currentGameStateManager.eg.CanGameStart())
+                //{
+                //    IncursionUI.CreateGameBanner("GAME CAN START");
+                //    int count = 5;
+                //    Timer countdown = incursionEvents.timer.Repeat(1f, 5, () =>
+                //    {
+                //        IncursionUI.CreateGameBanner("game starting in " + count.ToString());
+                //        count--;
+                //    });
+                //    Timer warningTimer = incursionEvents.timer.Once(30f, () =>
+                //    {
+                //        esm.ChangeState(EventLobbyClosed.Instance);
+                //        esm.ChangeState(EventRunning.Instance);
+                //        esm.currentGameStateManager.eg.StartGame();
+                //    });
+                //}
+            }
+
+            public new void Exit(IncursionStateManager.StateManager esm)
+            {
+                IemUtils.DLog("exiting in EventLobbyOpen");
+                IncursionUI.RemoveTeamUI();
+            }
+        }
+
+
+        /// <summary>
+        ///  players are not yet moved to the playing field, but joining teams is now closed
+        /// </summary>
+        public class EventLobbyClosed : IncursionStateManager.StateBase<EventLobbyClosed>, IncursionStateManager.IStateMachine
+        {
+            public new void Enter(IncursionStateManager.StateManager esm)
+            {
+                IemUtils.DLog("entry in EventLobbyClosed");
+                //IncursionHoldingArea.CloseTeamDoors();
+            }
+            public new void Exit(IncursionStateManager.StateManager esm)
+            {
+                IemUtils.DLog("exiting in EventLobbyClosed");
+                IncursionUI.RemoveTeamUI();
+            }
+        }
+
+
+
+        public class EventRunning : IncursionStateManager.StateBase<EventRunning>,
+            IncursionStateManager.IStateMachine
+        {
+            public new void Enter(IncursionStateManager.StateManager esm)
+            {
+                IemUtils.DLog("entry in EventRunning");
+                incursionEvents.Unsubscribe(nameof(OnRunPlayerMetabolism));
+
+
+            }
+            public new void Exit(IncursionStateManager.StateManager esm)
+            {
+                IemUtils.DLog("exiting in EventRunning");
+                incursionEvents.Subscribe(nameof(OnRunPlayerMetabolism));
+            }
+        }
+
+        public class EventComplete : IncursionStateManager.StateBase<EventComplete>,
+            IncursionStateManager.IStateMachine
+        {
+            public new void Enter(IncursionStateManager.StateManager sm)
+            {
+                EventStateManager esm = (EventStateManager)sm;
+                IemUtils.DLog("entry in EventComplete");
+
+                //don't want players to metablise while here
+                incursionEvents.Subscribe(nameof(OnRunPlayerMetabolism));
+
+                switch ((string)incursionEvents.Config["EventManagementMode"])
+                {
+                    // make the gsm available and open the event lobby
+                    case "repeating":
+                        if ((bool)incursionEvents.Config["AutoStart"] == true)
+                        {
+                            //esm.currentGameStateManager = esm.gameStateManagers.First().Value;
+                            esm.currentGameStateManager.ReinitializeGame();
+                            esm.ChangeState(EventManagementLobby.Instance);
+                            esm.Update();
+                        }
+                        break;
+
+                    //don't do anything, event is complete
+                    case "once":
+
+
+                        break;
+
+                    //gsm will be initialized by the scheduler
+                    case "scheduled":
+                        //esm.currentGameStateManager = esm.gameStateManagers.First().Value;
+                        //
+
+                        break;
+                }
+
+            }
+
+            public new void Exit(IncursionStateManager.StateManager esm)
+            {
+                IemUtils.DLog("exiting in EventComplete");
+                //incursionEvents.Subscribe(nameof(OnRunPlayerMetabolism));
+            }
+        }
+
+
+        #endregion
+
+        void ProcessScheduledEventToEventGame()
+        {
+            //process the list of teams and players who are preregistered for this
+            //scheduled event into the concrete game event
+            foreach (IemUtils.ScheduledEvent.ScheduledEventTeam seteam in esm.currentGameStateManager.nextEvent.seTeam)
+            {
+                Plugins.IemUtils.DLog("team is " + seteam.TeamName);
+                foreach (IemUtils.ScheduledEvent.ScheduledEventPlayer scheduledEventPlayer in seteam.sePlayer)
+                {
+                    IemUtils.DLog("sched player is " + scheduledEventPlayer.steamId);
+                    ulong id;
+                    ulong.TryParse(scheduledEventPlayer.steamId, out id);
+                    BasePlayer idplayer = IemUtils.FindPlayerByID(id);
+                    if (idplayer != null)
+                    {
+                        IemUtils.DLog("base player is " + idplayer.displayName);
+                    }
+
+                }
+            }
+        }
+
+
+        #region data
+
+        class StoredEventPlayer
+        {
+            public string UserId;
+            public string Name;
+
+            public StoredEventPlayer()
+            {
+            }
+
+            public StoredEventPlayer(BasePlayer player)
+            {
+                UserId = player.userID.ToString();
+                Name = player.displayName;
+            }
+        }
+
+        class StoredData
+        {
+            public HashSet<StoredEventPlayer> Players
+                = new HashSet<StoredEventPlayer>();
+
+            public StoredData()
+            {
+            }
+        }
+
+        #endregion
+
+        void OnRunPlayerMetabolism(PlayerMetabolism m, BaseCombatEntity entity)
+        {
+            var player = entity.ToPlayer();
+            if (player == null) return;
+            IemUtils.SetMetabolismValues(player);
+        }
+
+
+
+        #region chat control
+
+        [ChatCommand("Test")]
+        void Test(BasePlayer player, string command, string[] args)
+        {
+            if (!IemUtils.isAdmin(player)) return;
+            var info = new StoredEventPlayer(player);
+            //@todo not working... check this
+            if (storedData.Players.Contains(info))
+                PrintToChat(player, "Your data has already been added to the file");
+            else
+            {
+                PrintToChat(player, "Saving your data to the file");
+                storedData.Players.Add(info);
+                Interface.Oxide.DataFileSystem.WriteObject("MyDataFile", storedData);
+            }
+        }
+
+        #endregion
+
+
+        #region player hooks and calls
+
+        public void ShowTeamSelectHud(BasePlayer player)
+        {
+            IncursionEventGame.EventPlayer eventPlayer = IncursionEventGame.GetEventPlayer(player);
+            eventPlayer.psm.SubState(IncursionEventGame.PlayerInTeamSelectHUD.Instance);
+
+        }
+
+
         void OnEnterZone(string ZoneID, BasePlayer player)
         {
             if (esm != null)
@@ -206,6 +617,7 @@ namespace Oxide.Plugins
         void OnPlayerEnterTeamArea(BasePlayer player, IncursionEventGame.EventTeam team)
         {
             esm.currentGameStateManager.eg.AddPlayerToTeam(player, team);
+            esm.Update();
 
         }
 
@@ -268,7 +680,7 @@ namespace Oxide.Plugins
             {
                 if (eventPlayer.eventTeam == null)
                 {
-                    foreach (IncursionEventGame.EventTeam eventTeamsValue 
+                    foreach (IncursionEventGame.EventTeam eventTeamsValue
                         in esm.currentGameStateManager.eg.eventTeams.Values)
                     {
                         if (eventTeamsValue.teamPlayers.ContainsKey(player.UserIDString))
@@ -341,7 +753,10 @@ namespace Oxide.Plugins
         void OnPlayerInit(BasePlayer player)
         {
             Puts("OnPlayerInit works!");
+            IncursionUI.DisplayEnterLobbyUI(player);
         }
+
+
 
         void OnPlayerSleepEnded(BasePlayer player)
         {
@@ -397,6 +812,7 @@ namespace Oxide.Plugins
             return null;
         }
 
+        #endregion
 
         #region player hooks
         void OnPlayerRespawned(BasePlayer player)
@@ -414,263 +830,31 @@ namespace Oxide.Plugins
             Puts("playing respawn");
         }
 
-        #endregion
+        //Boolean OnItemRemovedFromContainer(ItemContainer container, Item item)
+        //{
+        //    Puts("OnItemRemovedFromContainer works!");
+        //    Puts(container.GetType().FullName);
+        //    return true;
+        //}
 
 
+        //void OnItemRemoved(ItemContainer container, Item item)
+        //{
+        //    Puts("OnItemRemovedFromContainer works!");
+        //}
 
-        public class EventStateManager : IncursionStateManager.StateManager
-        {
-            public IncursionHoldingArea.Lobby eventLobby;
-            private Dictionary<string, IncursionEventGame.GameStateManager> gameStateManagers
-                = new Dictionary<string, IncursionEventGame.GameStateManager>();
-            public IncursionEventGame.GameStateManager currentGameStateManager;
+        //void CanEquipItem(PlayerInventory inventory, Item item)
+        //{
+        //    Puts("CanEquipItem works!");
+        //}
 
-            public EventStateManager(IncursionStateManager.IStateMachine initialState) : base(initialState)
-            {
-            }
+        //void CanWearItem(PlayerInventory inventory, Item item)
+        //{
+        //    Puts("CanWearItem works!");
+        //}
 
-            public void RegisterGameStateManager(IncursionEventGame.GameStateManager gameStateManager)
-            {
-                gameStateManagers.Add(gameStateManager.Name, gameStateManager);
-                ChangeState(GameLoaded.Instance);
-                currentGameStateManager = gameStateManager;
-            }
-
-            public void GameComplete()
-            {
-                IemUtils.DLog("game is complete, and event manager has been informed");
-                currentGameStateManager.UnloadGame();
-
-                ChangeState(EventManagementLobby.Instance);
-                currentGameStateManager.ReinitializeGame();
-                ChangeState(EventLobbyOpen.Instance);
-            }
-
-            internal void StartScheduledGame()
-            {
-                ChangeState(EventManagementLobby.Instance);
-                currentGameStateManager.ReinitializeGame();
-                ChangeState(EventLobbyOpen.Instance);
-            }
-        }
-
-        public class PluginLoaded : IncursionStateManager.StateBase<PluginLoaded>,
-            IncursionStateManager.IStateMachine
-        {
-            public new void Enter(IncursionStateManager.StateManager esm)
-            {
-                IemUtils.DLog("entry in PluginLoaded");
-            }
-        }
-
-        public class ServerRunning : IncursionStateManager.StateBase<ServerRunning>,
-            IncursionStateManager.IStateMachine
-        {
-            public new void Enter(IncursionStateManager.StateManager esm)
-            {
-                IemUtils.DLog("entry in ServerRunning");
-                IncursionUI.CreateAdminBanner("state:" + esm.GetState().ToString());
-            }
-        }
-
-
-        public class EventManagementLobby : IncursionStateManager.StateBase<EventManagementLobby>,
-            IncursionStateManager.IStateMachine
-        {
-            public new void Enter(IncursionStateManager.StateManager esm)
-            {
-                incursionEvents.ResetPlayerStatuses();
-                IncursionUI.CreateAdminBanner("state:" + esm.GetState().ToString());
-                incursionEvents.CreateEsmLobby();
-                IncursionHoldingArea.CloseTeamDoors();
-
-                incursionEvents.Subscribe(nameof(OnRunPlayerMetabolism));
-
-                incursionEvents.MovePlayersToEsmLobby();
-
-            }
-
-            public new void Exit(IncursionStateManager.StateManager esm)
-            {
-                incursionEvents.Unsubscribe(nameof(OnRunPlayerMetabolism));
-            }
-
-        }
-
-        public class GameLoaded : IncursionStateManager.StateBase<GameLoaded>,
-            IncursionStateManager.IStateMachine
-        {
-
-        }
-
-
-        public class EventLobbyOpen : IncursionStateManager.StateBase<EventLobbyOpen>,
-            IncursionStateManager.IStateMachine
-        {
-            public new void Enter(IncursionStateManager.StateManager sm)
-            {
-                EventStateManager esm = ((EventStateManager)sm);
-                IemUtils.DLog("entry into EventLobbyOpen");
-                incursionEvents.Subscribe(nameof(OnRunPlayerMetabolism));
-                IncursionUI.CreateAdminBanner("state:" + esm.GetState().ToString());
-                RunServerCommand("env.time", "12");
-                
-                foreach (BasePlayer player in BasePlayer.activePlayerList)
-                {
-                    IncursionEventGame.EventPlayer eventPlayer
-                        = IncursionEventGame.GetEventPlayer(player); 
-                    eventPlayer.psm.eg = esm.currentGameStateManager.eg;
-                    eventPlayer.psm.ChangeState(IncursionEventGame.PlayerInEventLobbyNoTeam.Instance);
-                }
-                incursionEvents.rust.BroadcastChat("Opening lobby");
-                IncursionHoldingArea.OpenTeamDoors();
-            }
-
-
-            public new void Execute(IncursionStateManager.StateManager sm)
-            {
-
-                EventStateManager esm = (EventStateManager)sm;
-                IemUtils.DLog("executing in EventLobbyOpen");
-
-
-                if (esm.currentGameStateManager.eg.CanGameStart())
-                {
-                    IncursionUI.CreateBanner("GAME CAN START");
-                    int count = 5;
-                    Timer countdown = incursionEvents.timer.Repeat(1f, 5, () =>
-                    {
-                        IncursionUI.CreateBanner("game starting in " + count.ToString());
-                        count--;
-                    });
-                    Timer warningTimer = incursionEvents.timer.Once(5f, () =>
-                    {
-                        esm.ChangeState(EventLobbyClosed.Instance);
-                        esm.ChangeState(EventRunning.Instance);
-                        esm.currentGameStateManager.eg.StartGame();
-                        //currentGameStateManager.ReinitializeGame();
-                    });
-                }
-                IemUtils.DLog("here3");
-            }
-
-            public new void Exit(IncursionStateManager.StateManager esm)
-            {
-                IemUtils.DLog("exiting in EventLobbyOpen");
-                IncursionUI.RemoveTeamUI();
-            }
-        }
-
-
-
-        public class EventLobbyClosed : IncursionStateManager.StateBase<EventLobbyClosed>, IncursionStateManager.IStateMachine
-        {
-            public new void Enter(IncursionStateManager.StateManager esm)
-            {
-                IncursionUI.CreateAdminBanner("state:" + esm.GetState().ToString());
-                IemUtils.DLog("entry in EventLobbyClosed");
-                //IncursionHoldingArea.CloseTeamDoors();
-            }
-            public new void Exit(IncursionStateManager.StateManager esm)
-            {
-                IemUtils.DLog("exiting in EventLobbyClosed");
-                IncursionUI.RemoveTeamUI();
-            }
-        }
-
-
-
-        public class EventRunning : IncursionStateManager.StateBase<EventRunning>,
-            IncursionStateManager.IStateMachine
-        {
-            public new void Enter(IncursionStateManager.StateManager esm)
-            {
-                IncursionUI.CreateAdminBanner("state:" + esm.GetState().ToString());
-                IemUtils.DLog("entry in EventRunning");
-                incursionEvents.Unsubscribe(nameof(OnRunPlayerMetabolism));
-
-
-            }
-            public new void Exit(IncursionStateManager.StateManager esm)
-            {
-                IemUtils.DLog("exiting in EventRunning");
-                incursionEvents.Subscribe(nameof(OnRunPlayerMetabolism));
-            }
-        }
-
-
-
-
-
-        class StoredEventPlayer
-        {
-            public string UserId;
-            public string Name;
-
-            public StoredEventPlayer()
-            {
-            }
-
-            public StoredEventPlayer(BasePlayer player)
-            {
-                UserId = player.userID.ToString();
-                Name = player.displayName;
-            }
-        }
-
-        class StoredData
-        {
-            public HashSet<StoredEventPlayer> Players
-                = new HashSet<StoredEventPlayer>();
-
-            public StoredData()
-            {
-            }
-        }
-
-
-
-        void OnRunPlayerMetabolism(PlayerMetabolism m, BaseCombatEntity entity)
-        {
-            var player = entity.ToPlayer();
-            if (player == null) return;
-            IemUtils.SetMetabolismValues(player);
-        }
-
-
-
-        #region chat control
-
-        [ChatCommand("Test")]
-        void Test(BasePlayer player, string command, string[] args)
-        {
-            if (!IemUtils.isAdmin(player)) return;
-            var info = new StoredEventPlayer(player);
-            //@todo not working... check this
-            if (storedData.Players.Contains(info))
-                PrintToChat(player, "Your data has already been added to the file");
-            else
-            {
-                PrintToChat(player, "Saving your data to the file");
-                storedData.Players.Add(info);
-                Interface.Oxide.DataFileSystem.WriteObject("MyDataFile", storedData);
-            }
-        }
-
-        [ChatCommand("testmove")]
-        private void cmdChatZoneRemove(BasePlayer player, string command, string[] args)
-        {
-            if (!IemUtils.isAdmin(player)) return;
-            player.MovePosition(new Vector3(-376, 3, 4));
-            player.ClientRPCPlayer(null, player, "ForcePositionTo", player.transform.position);
-            player.TransformChanged();
-            player.SendNetworkUpdateImmediate();
-
-            IemUtils.SendMessage(player, "Value missing...");
-        }
 
         #endregion
-
 
 
         #region console control
@@ -684,7 +868,23 @@ namespace Oxide.Plugins
                 //if there is a EventGame availabe, autostart it
                 case "autostart":
                     SendReply(arg, "autostarting");
-                    OpenEvent();
+                    Config["AutoStart"] = true;
+                    esm.Update();
+                    return;
+                case "mode.scheduled":
+                    SendReply(arg, "autostarting");
+                    Config["EventManagementMode"] = "scheduled";
+                    Interface.Oxide.CallHook("OnEventManagementModeChanged");
+                    return;
+                case "mode.repeating":
+                    SendReply(arg, "autostarting");
+                    Config["EventManagementMode"] = "repeating";
+                    Interface.Oxide.CallHook("OnEventManagementModeChanged");
+                    return;
+                case "mode once":
+                    SendReply(arg, "autostarting");
+                    Config["EventManagementMode"] = "once";
+                    Interface.Oxide.CallHook("OnEventManagementModeChanged");
                     return;
                 case "offline":
                     SendReply(arg, "setting offline");
@@ -717,6 +917,26 @@ namespace Oxide.Plugins
                     SendReply(arg, "pausing game");
                     //PauseGame();
                     return;
+                case "hud":
+                    ShowTeamSelectHud(arg.Player());
+                    //PauseGame();
+                    return;
+                case "joinblueteam":
+                    SendReply(arg, "joining blue team");
+                    esm.currentGameStateManager.eg.AddPlayerToTeam(arg.Player(),
+                        esm.currentGameStateManager.eg.GetTeamById("team_1"));
+                    //PauseGame();
+                    return;
+                case "joinredteam":
+                    SendReply(arg, "joining red team");
+
+                    esm.currentGameStateManager.eg.AddPlayerToTeam(arg.Player(),
+                        esm.currentGameStateManager.eg.GetTeamById("team_2"));
+                    return;
+                case "joinrandomteam":
+                    SendReply(arg, "joining random team");
+                    //PauseGame();
+                    return;
 
 
 
@@ -724,30 +944,6 @@ namespace Oxide.Plugins
             }
         }
         #endregion
-
-        //Boolean OnItemRemovedFromContainer(ItemContainer container, Item item)
-        //{
-        //    Puts("OnItemRemovedFromContainer works!");
-        //    Puts(container.GetType().FullName);
-        //    return true;
-        //}
-
-
-        //void OnItemRemoved(ItemContainer container, Item item)
-        //{
-        //    Puts("OnItemRemovedFromContainer works!");
-        //}
-
-        //void CanEquipItem(PlayerInventory inventory, Item item)
-        //{
-        //    Puts("CanEquipItem works!");
-        //}
-
-        //void CanWearItem(PlayerInventory inventory, Item item)
-        //{
-        //    Puts("CanWearItem works!");
-        //}
-
 
     }
 

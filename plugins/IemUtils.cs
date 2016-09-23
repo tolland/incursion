@@ -3,6 +3,7 @@ using System;
 using Oxide.Core.Plugins;
 using UnityEngine;
 using Random = System.Random;
+using System.Collections.Generic;
 
 namespace Oxide.Plugins
 {
@@ -104,6 +105,18 @@ namespace Oxide.Plugins
             iemUtils.Puts(message);
         }
 
+        public static void SLog(string message)
+        {
+            ConVar.Server.Log("oxide/logs/Statelog.txt", message);
+            //iemUtils.Puts(message);
+        }
+
+        public static void DDLog(string message)
+        {
+            ConVar.Server.Log("oxide/logs/DDlog.txt", message);
+            //iemUtils.Puts(message);
+        }
+
         public static void LogL(string message)
         {
             ConVar.Server.Log("oxide/logs/Loadlog.txt", message);
@@ -203,6 +216,20 @@ namespace Oxide.Plugins
             return default(T);
         }
 
+        public static BasePlayer FindPlayerByID(ulong steamid)
+        {
+            BasePlayer targetplayer = BasePlayer.FindByID(steamid);
+            if (targetplayer != null)
+            {
+                return targetplayer;
+            }
+            targetplayer = BasePlayer.FindSleeping(steamid);
+            if (targetplayer != null)
+            {
+                return targetplayer;
+            }
+            return null;
+        }
 
 
 
@@ -270,5 +297,62 @@ namespace Oxide.Plugins
         }
 
         #endregion
+
+
+        #region environment modifications
+
+        public static void RunServerCommand(string key, string val)
+        {
+
+            iemUtils
+            .rust.RunServerCommand("env.time", "12");
+        }
+
+        #endregion
+
+        public class ScheduledEvent
+        {
+            public DateTime Start { get; set; }
+            DateTime End;   // ??
+            public int Length { get; set; }
+            public List<ScheduledEventTeam> seTeam = new List<ScheduledEventTeam>();
+            public List<ScheduledEventPlayer> sePlayer = new List<ScheduledEventPlayer>();
+
+            public ScheduledEvent(DateTime newStart, int newLength)
+            {
+                Start = newStart;
+                Length = newLength;
+            }
+
+            public class ScheduledEventTeam
+            {
+                public string TeamName { get; set; }
+                public string Color { get; set; }
+                public List<ScheduledEventPlayer> sePlayer = new List<ScheduledEventPlayer>();
+                public string JoinCommand { get; set; }
+                public bool TeamOpen { get; set; }
+
+                public ScheduledEventTeam(string newTeamName, 
+                    string newColor, 
+                    string newJoinCommand,
+                    bool newTeamOpen)
+                {
+                    TeamName = newTeamName;
+                    Color = newColor;
+                    JoinCommand = newJoinCommand;
+                    TeamOpen = newTeamOpen;
+                }
+            }
+
+            public class ScheduledEventPlayer
+            {
+                public string steamId { get; set; }
+
+                public ScheduledEventPlayer(string newSteamid)
+                {
+                    steamId = newSteamid;
+                }
+            }
+        }
     }
 }
