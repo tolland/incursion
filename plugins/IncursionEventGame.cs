@@ -38,13 +38,11 @@ namespace Oxide.Plugins
         void Init()
         {
             incursionEventGame = this;
-
             IemUtils.LogL("IncursionEventGame :Init complete");
         }
 
         void Loaded()
         {
-
             IemUtils.LogL("IncursionEventGame: server loaded complete");
         }
         
@@ -169,7 +167,7 @@ namespace Oxide.Plugins
 
             public virtual bool StartGame()
             {
-                IemUtils.DLog("calling startgame in event game");
+                //IemUtils.DLog("calling startgame in event game");
                 incursionEventGame.rust.RunServerCommand("env.time", "12");
                 return true;
             }

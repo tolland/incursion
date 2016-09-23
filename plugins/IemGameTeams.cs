@@ -11,7 +11,6 @@ using Oxide.Core.Configuration;
 
 namespace Oxide.Plugins
 {
-
     [Info("Incursion Team Game", "tolland", "0.1.0")]
     class IemGameTeams : RustPlugin
     {
@@ -26,7 +25,7 @@ namespace Oxide.Plugins
 
         static IemGameTeams iemGameTeams = null;
 
-
+    
         DynamicConfigFile incursionEventsConfig;
         private bool AutoStart = false;
 
