@@ -72,7 +72,6 @@ namespace Oxide.Plugins
         }
 
 
-
         private void OnServerInitialized()
         {
             IemUtils.LogL("iemGAmeTeams: OnServerInitialized complete");
@@ -117,7 +116,6 @@ namespace Oxide.Plugins
             }
         }
 
-
         public class TeamGameStateManager : IncursionEventGame.GameStateManager
         {
 
@@ -135,6 +133,7 @@ namespace Oxide.Plugins
                 IemUtils.DLog("reinit game in IemGameTeams");
                 eg = new TeamEventGame(this);
                 ChangeState(GameEventLoaded.Instance);
+
             }
 
         }
@@ -186,6 +185,9 @@ namespace Oxide.Plugins
         public class GameEventCanStart : IncursionStateManager.StateBase<GameEventCanStart>,
             IncursionStateManager.IStateMachine
         {
+            private Timer warningTimer = null;
+            //private static readonly Object obj = new Object();
+
             public new void Enter(IncursionStateManager.StateManager gsm)
             {
                 IemUtils.DLog("entry in GameEventCanStart");
@@ -195,6 +197,8 @@ namespace Oxide.Plugins
             {
                 TeamGameStateManager gsm = (TeamGameStateManager)sm;
                 IemUtils.DLog("GameEventCanStart: Execute");
+
+               // Plugins.IemUtils.SLog(this.GetHashCode().ToString());
 
                 if (!gsm.eg.CanGameStart())
                 {
@@ -206,14 +210,45 @@ namespace Oxide.Plugins
                     {
 
                         IncursionUI.CreateGameBanner("warning - game starting shortly");
-                        Timer warningTimer = iemGameTeams.timer.Once(5f, () =>
-                        {
-                            gsm.ChangeState(GameLobby.Instance);
-                        });
+                       // IemUtils.SLog("setting up timer");
 
-                        
+                        if (warningTimer == null)
+                        {
+                           // IemUtils.SLog("is null");
+                        }
+                        else
+                        {
+
+                            if (warningTimer.Destroyed)
+                            {
+                             //   IemUtils.SLog("warningTimer.Destroyed");
+                            }
+                        }
+
+                        if (warningTimer == null || warningTimer.Destroyed)
+                        {
+                            //IemUtils.SLog("in conditional");
+                            warningTimer = iemGameTeams.timer.Once(5f, () =>
+                            {
+                              //  IemUtils.SLog("in timer");
+                                IncursionUI.CreateGameBanner("warning - got to game lobby call");
+                                               gsm.ChangeState(GameLobby.Instance);
+                                });
+                        }
                     }
+
+
+
+
                 }
+            }
+
+            public new void Exit(IncursionStateManager.StateManager sm)
+            {
+                IemUtils.SLog("before cancel timer");
+                warningTimer.Destroy();
+                IemUtils.SLog("after cancel timer");
+                IncursionUI.CreateGameBanner("EXITING");
             }
         }
 
@@ -250,6 +285,8 @@ namespace Oxide.Plugins
         public class GameLobby : IncursionStateManager.StateBase<GameLobby>,
             IncursionStateManager.IStateMachine
         {
+            private Timer warningTimer;
+
             public new void Enter(IncursionStateManager.StateManager sm)
             {
                 IncursionEventGame.GameStateManager gsm = (IncursionEventGame.GameStateManager)sm;
@@ -266,7 +303,7 @@ namespace Oxide.Plugins
                 }
 
                 IncursionUI.CreateGameBanner("GAME LOBBY");
-                Timer warningTimer = iemGameTeams.timer.Once(gsm.eg.GameLobbyWait, () =>
+                warningTimer = iemGameTeams.timer.Once(gsm.eg.GameLobbyWait, () =>
                 {
                     gsm.ChangeState(GameStarted.Instance);
                 });
@@ -274,6 +311,8 @@ namespace Oxide.Plugins
 
             public new void Exit(IncursionStateManager.StateManager esm)
             {
+                warningTimer.Destroy();
+
                 foreach (BasePlayer player in BasePlayer.activePlayerList)
                 {
                     IncursionEventGame.EventPlayer eventPlayer
@@ -319,8 +358,8 @@ namespace Oxide.Plugins
                         gsm.ChangeState(GameComplete.Instance);
                     });
                 }
-
             }
+
 
             public new void Execute(IncursionStateManager.StateManager sm)
             {
@@ -356,7 +395,6 @@ namespace Oxide.Plugins
                 iemGameTeams.Unsubscribe(nameof(OnRunPlayerMetabolism));
             }
         }
-
 
         public class GameComplete : IncursionStateManager.StateBase<GameComplete>,
             IncursionStateManager.IStateMachine
@@ -400,6 +438,39 @@ namespace Oxide.Plugins
 
         }
 
+        public class GameCancelled : IncursionStateManager.StateBase<GameCancelled>,
+            IncursionStateManager.IStateMachine
+        {
+            private Timer warningTimer;
+            public new void Enter(IncursionStateManager.StateManager sm)
+            {
+                TeamGameStateManager gsm = (TeamGameStateManager)sm;
+
+                iemGameTeams.Subscribe(nameof(OnRunPlayerMetabolism));
+                foreach (IncursionEventGame.EventPlayer eventPlayer in gsm.eg.gamePlayers.Values)
+                {
+                    eventPlayer.psm.ChangeState(IncursionEventGame.PlayerInPostGame.Instance);
+
+                }
+
+                IncursionUI.CreateGameBanner("Game cancelled");
+                warningTimer = iemGameTeams.timer.Once(5f, () =>
+                {
+
+                    gsm.ChangeState(GameUnloaded.Instance);
+                    iemGameTeams.esm.ChangeState(IncursionEvents.EventComplete.Instance);
+                });
+            }
+
+            public new void Exit(IncursionStateManager.StateManager esm)
+            {
+                warningTimer.Destroy();
+
+                iemGameTeams.Unsubscribe(nameof(OnRunPlayerMetabolism));
+            }
+
+        }
+
         public class GameUnloaded : IncursionStateManager.StateBase<GameUnloaded>,
             IncursionStateManager.IStateMachine
         {
@@ -430,6 +501,17 @@ namespace Oxide.Plugins
             }
         }
 
-
+        [ConsoleCommand("gamex")]
+        void ccmdEvent222(ConsoleSystem.Arg arg)
+        {
+            if (!IemUtils.hasAccess(arg)) return;
+            switch (arg.Args[0].ToLower())
+            {
+                case "cancel":
+                    SendReply(arg, "setting cancelled");
+                    teamGameStateManager.ChangeState(IemGameTeams.GameCancelled.Instance);
+                    return;
+            }
+        }
     }
 }

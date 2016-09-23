@@ -175,15 +175,17 @@ namespace Oxide.Plugins
                 //ChangeState(EventManagementLobby.Instance);
             }
 
+
             internal void StartScheduledGame(IemUtils.ScheduledEvent sevent)
             {
 
-                if (GetState() == EventManagementLobby.Instance)
+                if (IsAny(EventManagementLobby.Instance))
                 {
                     currentGameStateManager.ReinitializeGame();
                     currentGameStateManager.nextEvent = sevent;
+                    
 
-                    ChangeState(EventManagementLobby.Instance);
+                    incursionEvents.esm.Update();
                 }
                 else
                 {
@@ -251,8 +253,6 @@ namespace Oxide.Plugins
                 //there are no checks to do to proceed to the event management lobby
                 esm.ChangeState(EventManagementLobby.Instance);
             }
-
-
         }
 
 
@@ -301,6 +301,7 @@ namespace Oxide.Plugins
                         if ((bool)incursionEvents.Config["AutoStart"] == true)
                         {
                             esm.currentGameStateManager = esm.gameStateManagers.First().Value;
+                            esm.ChangeState(GameLoaded.Instance);
                             esm.ChangeState(EventLobbyOpen.Instance);
                             esm.Update();
                         }
@@ -309,6 +310,7 @@ namespace Oxide.Plugins
                         if ((bool)incursionEvents.Config["AutoStart"] == true)
                         {
                             esm.currentGameStateManager = esm.gameStateManagers.First().Value;
+                            esm.ChangeState(GameLoaded.Instance);
                             esm.ChangeState(EventLobbyOpen.Instance);
                             esm.Update();
                         }
@@ -317,7 +319,8 @@ namespace Oxide.Plugins
                     //gsm will be initialized by the scheduler
                     case "scheduled":
                         //esm.currentGameStateManager = esm.gameStateManagers.First().Value;
-                        //
+                        esm.ChangeState(GameLoaded.Instance);
+                        esm.ChangeState(EventLobbyOpen.Instance);
 
                         break;
                 }
@@ -466,6 +469,8 @@ namespace Oxide.Plugins
                 //don't want players to metablise while here
                 incursionEvents.Subscribe(nameof(OnRunPlayerMetabolism));
 
+                esm.ChangeState(EventManagementLobby.Instance);
+
                 switch ((string)incursionEvents.Config["EventManagementMode"])
                 {
                     // make the gsm available and open the event lobby
@@ -474,7 +479,6 @@ namespace Oxide.Plugins
                         {
                             //esm.currentGameStateManager = esm.gameStateManagers.First().Value;
                             esm.currentGameStateManager.ReinitializeGame();
-                            esm.ChangeState(EventManagementLobby.Instance);
                             esm.Update();
                         }
                         break;
@@ -502,6 +506,15 @@ namespace Oxide.Plugins
             }
         }
 
+        //public class EventCancelled : IncursionStateManager.StateBase<EventCancelled>,
+        //    IncursionStateManager.IStateMachine
+        //{
+        //    public new void Enter(IncursionStateManager.StateManager sm)
+        //    {
+        //        EventStateManager esm = (EventStateManager)sm;
+        //        esm.currentGameStateManager.ChangeState(IemGameTeams.GameCancelled.Instance);
+        //    }
+        //}
 
         #endregion
 
@@ -897,7 +910,7 @@ namespace Oxide.Plugins
                 case "offline":
                     SendReply(arg, "setting offline");
                     return;
-
+                    
                 //the following section are debug commands and generally not used
                 //by admins unless there is a problem with the game
                 case "init":
