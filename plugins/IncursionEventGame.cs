@@ -13,447 +13,443 @@ using Rust;
 
 namespace Oxide.Plugins
 {
-    [Info("Incursion Event Game", "tolland", "0.1.0")]
+	[Info ("Incursion Event Game", "tolland", "0.1.0")]
 
-    public class IncursionEventGame : RustPlugin
-    {
-    	[PluginReference]
-        IncursionUI IncursionUI;
-
-        [PluginReference]
-        IemUtils IemUtils;
-
-        [PluginReference]
-        Plugin ZoneManager;
+	public class IncursionEventGame : RustPlugin
+	{
+		[PluginReference]
+		IncursionUI IncursionUI;
 
 		[PluginReference]
-        IncursionStateManager IncursionStateManager;
+		IemUtils IemUtils;
 
-        static IncursionEventGame incursionEventGame = null;
+		[PluginReference]
+		Plugin ZoneManager;
 
-        // this holds a reference to the currently active game state manager
-        // which is implemented in the specific game that is current
-        private GameStateManager gameStateManager;
+		[PluginReference]
+		IncursionStateManager IncursionStateManager;
 
-        void Init()
-        {
-            incursionEventGame = this;
-            IemUtils.LogL("IncursionEventGame :Init complete");
-        }
+		static IncursionEventGame incursionEventGame = null;
 
-        void Loaded()
-        {
-            IemUtils.LogL("IncursionEventGame: server loaded complete");
-        }
-        
-        void Unload()
-        {
-            IemUtils.LogL("IncursionEventGame: Unload complete");
+		void Init ()
+		{
+			incursionEventGame = this;
+			IemUtils.LogL ("IncursionEventGame :Init complete");
+		}
 
-        }
+		void Loaded ()
+		{
+			IemUtils.LogL ("IncursionEventGame: server loaded complete");
+		}
 
-        void OnServerInitialized()
-        {
+		void Unload ()
+		{
+			IemUtils.LogL ("IncursionEventGame: Unload complete");
 
-            IemUtils.LogL("IncursionEventGame: server initialized complete");
-        }
+		}
 
-        /// <summary>
-        /// This implements a minimal viable game
-        /// and is designed to be used as a base class in a game implementation
-        /// </summary>
-        public class EventGame
-        {
-            //this game is managed by this object
-            public GameStateManager gsm;
+		void OnServerInitialized ()
+		{
 
-            //team or solo game
-            public bool TeamGame { get; set; }
+			IemUtils.LogL ("IncursionEventGame: server initialized complete");
+		}
 
-            //ignored if not team game
-            public bool FixedNumberOfTeams { get; set; }
-            public int MinTeams { get; set; }
-            public int MaxTeams { get; set; }
-            public int MinPlayersPerTeam { get; set; }
-            public int MaxPlayersPerTeam { get; set; }
+		/// <summary>
+		/// This implements a minimal viable game
+		/// and is designed to be used as a base class in a game implementation
+		/// </summary>
+		public class EventGame
+		{
+			//this game is managed by this object
+			public GameStateManager gsm;
 
+			//team or solo game
+			public bool TeamGame { get; set; }
 
-            //private readonly Dictionary<BasePlayer, ZoneFlags> playerTags 
-            //= new Dictionary<BasePlayer, ZoneFlags> ();
-            public Dictionary<string, EventTeam> eventTeams
-                = new Dictionary<string, EventTeam>();
+			//ignored if not team game
+			public bool FixedNumberOfTeams { get; set; }
 
-            public Dictionary<string, EventPlayer> gamePlayers
-                = new Dictionary<string, EventPlayer>();
+			public int MinTeams { get; set; }
 
-            //total of players on all teams, or all solo players
-            public int MinPlayers { get; set; }
-            public int MaxPlayers { get; set; }
+			public int MaxTeams { get; set; }
 
-            //can players spectate when dead, or not in game
-            public bool CanSpectate { get; set; }
+			public int MinPlayersPerTeam { get; set; }
 
-            //if true, event manager will call end game
-            public bool TimedGame { get; set; }
-
-            //time limit in seconds
-            public int TimeLimit { get; set; }
-
-            public bool autoStart { get; set; }
-
-            public Vector3 Location { get; set; }
-            public List<string> GameIntroBanner { get; set; }
+			public int MaxPlayersPerTeam { get; set; }
 
 
-            public int GameLobbyWait { get; set; }
-            
+			//private readonly Dictionary<BasePlayer, ZoneFlags> playerTags
+			//= new Dictionary<BasePlayer, ZoneFlags> ();
+			public Dictionary<string, EventTeam> eventTeams
+                = new Dictionary<string, EventTeam> ();
 
-            /// <summary>
-            /// mysql persistance fields
-            /// </summary>
+			public Dictionary<string, EventPlayer> gamePlayers
+                = new Dictionary<string, EventPlayer> ();
 
-            public int GameStartedDateTime { get; set; }
-            public int GameEndedDateTime { get; set; }
+			//total of players on all teams, or all solo players
+			public int MinPlayers { get; set; }
 
-            public EventGame(GameStateManager gamestatemanager) : this()
-            {
-                gsm = gamestatemanager;
-            }
+			public int MaxPlayers { get; set; }
 
-            public EventGame()
-            {
-                TeamGame = true;
-                FixedNumberOfTeams = true;
-                MinTeams = 2;
-                MaxTeams = 2;
+			//can players spectate when dead, or not in game
+			public bool CanSpectate { get; set; }
 
-                MinPlayers = 1;
-                MaxPlayers = 20;
-                MinPlayersPerTeam = 0;
-                MaxPlayersPerTeam = 12;
+			//if true, event manager will call end game
+			public bool TimedGame { get; set; }
 
-                GameLobbyWait = 30;
+			//time limit in seconds
+			public int TimeLimit { get; set; }
 
-                eventTeams.Add("team_1", new EventTeam("team_1", "Blue Team",
-                    new Vector3(-394, 3, -25), "blue"));
-                eventTeams.Add("team_2", new EventTeam("team_2", "Red Team",
-                    new Vector3(-376, 3, 3), "red"));
-                //eventTeams.Add("team_3", new EventTeam("team_3", "Green Team", "green"));
-                //eventTeams.Add("team_4", new EventTeam("team_4", "Yellow Team", "yellow"));
+			public bool autoStart { get; set; }
 
-                //support rulesGUI format??
-                GameIntroBanner = new List<string>
-                {
-                    "<color=blue>Play will start in 10 seconds.</color>",
-                    "<color=red>The team that shoots the most targets will win.</color>",
-                    "<color=red>FYI: If the opposing team players are dead, they can't shoot targets!</color>",
-                    "<color=red>one possible strategy is to have half your team shooting targets, and the other half attacking/defending the other team</color>",
-                    "<color=yellow>However you don't get points for killing your opponents</color>"
-                };
+			public Vector3 Location { get; set; }
+
+			public List<string> GameIntroBanner { get; set; }
 
 
-                CanSpectate = true;
-                TimedGame = true;
-                //in seconds
-                TimeLimit = 120;
-
-                Location = new Vector3(-396, 3, -25);
-            }
-
-            public bool IsOpen()
-            {
-                return true;
-            }
-
-            public virtual bool StartGame()
-            {
-                //IemUtils.DLog("calling startgame in event game");
-                incursionEventGame.rust.RunServerCommand("env.time", "12");
-                return true;
-            }
-
-            public bool PauseGame()
-            {
-                return true;
-            }
-
-            public bool EndGame()
-            {
-                return true;
-            }
+			public int GameLobbyWait { get; set; }
 
 
+			/// <summary>
+			/// mysql persistance fields
+			/// </summary>
+
+			public int GameStartedDateTime { get; set; }
+
+			public int GameEndedDateTime { get; set; }
+
+			public EventGame (GameStateManager gamestatemanager) : this ()
+			{
+				gsm = gamestatemanager;
+			}
+
+            public bool ForceStart = false;
+
+            public EventGame ()
+			{
+				TeamGame = true;
+				FixedNumberOfTeams = true;
+				MinTeams = 2;
+				MaxTeams = 2;
+
+				MinPlayers = 1;
+				MaxPlayers = 20;
+				MinPlayersPerTeam = 0;
+				MaxPlayersPerTeam = 12;
+
+			    
+
+				GameLobbyWait = 30;
+
+				eventTeams.Add ("team_1", new EventTeam ("team_1", "Blue Team",
+					new Vector3 (-394, 3, -25), "blue"));
+				eventTeams.Add ("team_2", new EventTeam ("team_2", "Red Team",
+					new Vector3 (-376, 3, 3), "red"));
+				//eventTeams.Add("team_3", new EventTeam("team_3", "Green Team", "green"));
+				//eventTeams.Add("team_4", new EventTeam("team_4", "Yellow Team", "yellow"));
+
+				//support rulesGUI format??
+				GameIntroBanner = new List<string> {
+					"<color=blue>Play will start in 10 seconds.</color>",
+					"<color=red>The team that shoots the most targets will win.</color>",
+					"<color=red>FYI: If the opposing team players are dead, they can't shoot targets!</color>",
+					"<color=red>one possible strategy is to have half your team shooting targets, and the other half attacking/defending the other team</color>",
+					"<color=yellow>However you don't get points for killing your opponents</color>"
+				};
 
 
-            int TimeRemaining()
-            {
-                return 5;
-            }
+				CanSpectate = true;
+				TimedGame = true;
+				//in seconds
+				TimeLimit = 120;
 
-            public bool InitializePlayingField()
-            {
+				Location = new Vector3 (-396, 3, -25);
+			}
 
-                return true;
-            }
+			public bool IsOpen ()
+			{
+				return true;
+			}
 
-            bool ClearPlayingField()
-            {
+			public virtual bool StartGame ()
+			{
+				//IemUtils.DLog("calling startgame in event game");
+				incursionEventGame.rust.RunServerCommand ("env.time", "12");
+				return true;
+			}
 
-                return true;
-            }
+			public bool PauseGame ()
+			{
+				return true;
+			}
 
-            public bool CanGameStart()
-            {
+			public bool EndGame ()
+			{
+				return true;
+			}
 
-                int totalPlayers = 0;
-                foreach (KeyValuePair<string, EventTeam> team in eventTeams)
-                {
-                    if (team.Value.teamPlayers.Count < MinPlayersPerTeam)
-                    {
-                        IemUtils.DLog("too few players on team " + team.Value.TeamName);
-                        return false;
-                    }
 
-                    if (team.Value.teamPlayers.Count > MaxPlayersPerTeam)
-                    {
-                        IemUtils.DLog("too many players on team " + team.Value.TeamName);
-                        return false;
-                    }
 
-                    totalPlayers = totalPlayers + team.Value.teamPlayers.Count;
-                }
 
-                if (totalPlayers < MinPlayers)
-                {
-                    IemUtils.DLog("below min players");
-                    return false;
-                }
+			int TimeRemaining ()
+			{
+				return 5;
+			}
 
-                if (totalPlayers > MaxPlayers)
-                {
-                    IemUtils.DLog("above max players");
-                    return false;
-                }
+			public bool InitializePlayingField ()
+			{
+
+				return true;
+			}
+
+			bool ClearPlayingField ()
+			{
+
+				return true;
+			}
+
+			public bool CanGameStart ()
+			{
+
+			    if (ForceStart)
+			        return true;
+
+				int totalPlayers = 0;
+				foreach (KeyValuePair<string, EventTeam> team in eventTeams) {
+					if (team.Value.teamPlayers.Count < MinPlayersPerTeam) {
+						IemUtils.DLog ("too few players on team " + team.Value.TeamName);
+						return false;
+					}
+
+					if (team.Value.teamPlayers.Count > MaxPlayersPerTeam) {
+						IemUtils.DLog ("too many players on team " + team.Value.TeamName);
+						return false;
+					}
+
+					totalPlayers = totalPlayers + team.Value.teamPlayers.Count;
+				}
+
+				if (totalPlayers < MinPlayers) {
+					IemUtils.DLog ("below min players");
+					return false;
+				}
+
+				if (totalPlayers > MaxPlayers) {
+					IemUtils.DLog ("above max players");
+					return false;
+				}
                 
-                return true;
-            }
+				return true;
+			}
 
-            public EventTeam GetTeamById(string teamId)
-            {
-                if (eventTeams == null)
-                    Plugins.IemUtils.DLog("eventTeams is null");
+			public EventTeam GetTeamById (string teamId)
+			{
+				if (eventTeams == null)
+					Plugins.IemUtils.DLog ("eventTeams is null");
 
-                return eventTeams[teamId];
+				return eventTeams [teamId];
 
-            }
+			}
 
-            public List<IncursionUI.UiTeam> ConvertTeamsToDict()
-            {
+			public List<IncursionUI.UiTeam> ConvertTeamsToDict ()
+			{
 
-                List<IncursionUI.UiTeam> teamData = new List<IncursionUI.UiTeam>();
-                foreach (KeyValuePair<string, IncursionEventGame.EventTeam> teamPair in eventTeams)
-                {
-                    EventTeam team = teamPair.Value;
+				List<IncursionUI.UiTeam> teamData = new List<IncursionUI.UiTeam> ();
+				foreach (KeyValuePair<string, IncursionEventGame.EventTeam> teamPair in eventTeams) {
+					EventTeam team = teamPair.Value;
 
-                    List<string> players = new List<string>() { };
-                    foreach (KeyValuePair<string, EventPlayer> player in team.teamPlayers)
-                    {
-                        players.Add(player.Value.player.displayName);
-                    }
-                    IncursionUI.UiTeam uiTeam = new IncursionUI.UiTeam(team.TeamName, players, team.Colour);
-                    teamData.Add(uiTeam);
+					List<string> players = new List<string> () { };
+					foreach (KeyValuePair<string, EventPlayer> player in team.teamPlayers) {
+						players.Add (player.Value.player.displayName);
+					}
+					IncursionUI.UiTeam uiTeam = new IncursionUI.UiTeam (team.TeamName, players, team.Colour);
+					teamData.Add (uiTeam);
 
-                }
-                return teamData;
-            }
+				}
+				return teamData;
+			}
 
 
 
 
-            public bool AddPlayerToTeam(BasePlayer player, EventTeam team)
-            {
-                IemUtils.DLog("calling add player to team");
-                //If the BasePlayer is a new connection
-                EventPlayer eventPlayer
-                    = GetEventPlayer(player);
+			public bool AddPlayerToTeam (BasePlayer player, EventTeam team)
+			{
+				IemUtils.DLog ("calling add player to team");
+				//If the BasePlayer is a new connection
+				EventPlayer eventPlayer
+                    = GetEventPlayer (player);
 
-                if (!gamePlayers.ContainsKey(eventPlayer.PlayerId))
-                    gamePlayers.Add(eventPlayer.PlayerId, eventPlayer);
+				if (!gamePlayers.ContainsKey (eventPlayer.PlayerId))
+					gamePlayers.Add (eventPlayer.PlayerId, eventPlayer);
 
-                if (eventPlayer.eventTeam != null)
-                {
-                    if (eventPlayer.eventTeam.Equals(team))
-                    {
-                        IemUtils.DLog("player is already in team");
-                        return true;
-                    }
+				if (eventPlayer.eventTeam != null) {
+					if (eventPlayer.eventTeam.Equals (team)) {
+						IemUtils.DLog ("player is already in team");
+						return true;
+					}
 
-                    if (eventPlayer.eventTeam.teamPlayers.ContainsKey(eventPlayer.PlayerId))
-                        eventPlayer.eventTeam.teamPlayers.Remove(eventPlayer.PlayerId);
-                }
+					if (eventPlayer.eventTeam.teamPlayers.ContainsKey (eventPlayer.PlayerId))
+						eventPlayer.eventTeam.teamPlayers.Remove (eventPlayer.PlayerId);
+				}
 
 
 
-                if (!team.teamPlayers.ContainsKey(eventPlayer.PlayerId))
-                    team.teamPlayers.Add(eventPlayer.PlayerId, eventPlayer);
+				if (!team.teamPlayers.ContainsKey (eventPlayer.PlayerId))
+					team.teamPlayers.Add (eventPlayer.PlayerId, eventPlayer);
 
-                eventPlayer.eventTeam = team;
-                eventPlayer.psm.ChangeState(PlayerInEventLobbyTeamed.Instance);
+				eventPlayer.eventTeam = team;
+				eventPlayer.psm.ChangeState (PlayerInEventLobbyTeamed.Instance);
 
-                return true;
-            }
+				return true;
+			}
 
-            public bool MovePlayersToGame()
-            {
-                foreach (KeyValuePair<string, EventPlayer> eventPlayer
-                    in gamePlayers)
-                {
-                    BasePlayer player = eventPlayer.Value.player;
-                    Plugins.IemUtils.DLog("moving players to game");
+			public bool MovePlayersToGame ()
+			{
+				foreach (KeyValuePair<string, EventPlayer> eventPlayer
+                    in gamePlayers) {
+					BasePlayer player = eventPlayer.Value.player;
+					Plugins.IemUtils.DLog ("moving players to game");
 
-                    IemUtils.MovePlayerTo(player, eventPlayer.Value.eventTeam.Location);
-                }
+					IemUtils.MovePlayerTo (player, eventPlayer.Value.eventTeam.Location);
+				}
 
-                return true;
-            }
-
-
-            public bool MovePlayerToGame(EventPlayer eventPlayer)
-            {
-
-                BasePlayer player = eventPlayer.player;
-                Plugins.IemUtils.DLog("moving player to game");
-
-                IemUtils.MovePlayerTo(player, eventPlayer.eventTeam.Location);
+				return true;
+			}
 
 
-                return true;
-            }
+			public bool MovePlayerToGame (EventPlayer eventPlayer)
+			{
 
-            public Dictionary<string, List<string>> ConvertResultsToDict()
-            {
+				BasePlayer player = eventPlayer.player;
+				Plugins.IemUtils.DLog ("moving player to game");
 
-                Dictionary<string, List<string>> teamData = new Dictionary<string, List<string>>();
-                foreach (KeyValuePair<string, IncursionEventGame.EventTeam> team in eventTeams)
-                {
-                    List<string> players = new List<string>() { };
-                    foreach (KeyValuePair<string, EventPlayer> player in team.Value.teamPlayers)
-                    {
-                        players.Add(player.Value.player.displayName + " score "
-                            + player.Value.Score.ToString());
-                    }
-
-                    teamData.Add(team.Value.TeamName, players);
-
-                }
-                return teamData;
-            }
+				IemUtils.MovePlayerTo (player, eventPlayer.eventTeam.Location);
 
 
-            public List<IncursionUI.UiTeamResult> ConvertResultsToUiTeamResults()
-            {
+				return true;
+			}
 
-                List<IncursionUI.UiTeamResult> teamData = new List<IncursionUI.UiTeamResult>();
-                foreach (KeyValuePair<string, IncursionEventGame.EventTeam> team in eventTeams)
-                {
-                    List<string> players = new List<string>() { };
-                    foreach (KeyValuePair<string, EventPlayer> player in team.Value.teamPlayers)
-                    {
-                        players.Add(player.Value.player.displayName + " score "
-                            + player.Value.Score.ToString());
-                    }
-                    IncursionUI.UiTeamResult result = new IncursionUI.UiTeamResult(team.Value.TeamName,
-                        players, team.Value.Colour)
+			public Dictionary<string, List<string>> ConvertResultsToDict ()
+			{
+
+				Dictionary<string, List<string>> teamData = new Dictionary<string, List<string>> ();
+				foreach (KeyValuePair<string, IncursionEventGame.EventTeam> team in eventTeams) {
+					List<string> players = new List<string> () { };
+					foreach (KeyValuePair<string, EventPlayer> player in team.Value.teamPlayers) {
+						players.Add (player.Value.player.displayName + " score "
+						+ player.Value.Score.ToString ());
+					}
+
+					teamData.Add (team.Value.TeamName, players);
+
+				}
+				return teamData;
+			}
+
+
+			public List<IncursionUI.UiTeamResult> ConvertResultsToUiTeamResults ()
+			{
+
+				List<IncursionUI.UiTeamResult> teamData = new List<IncursionUI.UiTeamResult> ();
+				foreach (KeyValuePair<string, IncursionEventGame.EventTeam> team in eventTeams) {
+					List<string> players = new List<string> () { };
+					foreach (KeyValuePair<string, EventPlayer> player in team.Value.teamPlayers) {
+						players.Add (player.Value.player.displayName + " score "
+						+ player.Value.Score.ToString ());
+					}
+					IncursionUI.UiTeamResult result = new IncursionUI.UiTeamResult (team.Value.TeamName,
+						                                                 players, team.Value.Colour)
                     { };
 
-                    teamData.Add(result);
+					teamData.Add (result);
 
-                }
-                return teamData;
-            }
+				}
+				return teamData;
+			}
 
-            public void ShowGameResultUI()
-            {
-                var gameresult = ConvertResultsToUiTeamResults();
-                foreach (IncursionEventGame.EventPlayer eventPlayer in gsm.eg.gamePlayers.Values)
-                {
+			public void ShowGameResultUI ()
+			{
+				var gameresult = ConvertResultsToUiTeamResults ();
+				foreach (IncursionEventGame.EventPlayer eventPlayer in gsm.eg.gamePlayers.Values) {
 
-                    IncursionUI.ShowResultsUi(eventPlayer.player, gameresult);
-                }
-
-
-            }
-
-            public void RemoveGameResultUI()
-            {
-                IncursionUI.RemoveGameResultUI();
-            }
-
-        }
+					IncursionUI.ShowResultsUi (eventPlayer.player, gameresult);
+				}
 
 
+			}
 
-        public class EventPlayer : MonoBehaviour
-        {
-            public BasePlayer player;
-            public IncursionEventGame.EventTeam eventTeam;
+			public void RemoveGameResultUI ()
+			{
+				IncursionUI.RemoveGameResultUI ();
+			}
 
-            //@todo should the Monobehaviour be applied to the Statemanager?
-            public PlayerStateManager psm;
-
-            public EventPlayer()
-            {
-                IemUtils.DLog("calling constructor in eventplayer monobehavior");
-                psm = new PlayerStateManager(this, PlayerUnknown.Instance);
-                IemUtils.DLog("calling constructor2 in eventplayer monobehavior");
-                IemUtils.DLog("psm is null " + psm.GetState().ToString());
-
-                if (psm == null)
-                    IemUtils.DLog("psm is null " + psm.ToString());
-
-
-            }
-
-            public string PlayerId { get; set; }
-            public int Score { get; set; }
-
-            void Awake()
-            {
-                IemUtils.DLog("calling awake in eventplayer monobehavior");
-                player = GetComponent<BasePlayer>();
-                psm.eventPlayer = this;
-
-            }
-        }
+		}
 
 
 
-        public class GameStateManager : IncursionStateManager.StateManager
-        {
-            public string Name { get; set; }
-            public IncursionEventGame.EventPlayer eventPlayer;
-            public IncursionEventGame.EventGame eg;
-            public IemUtils.ScheduledEvent nextEvent;
+		public class EventPlayer : MonoBehaviour
+		{
+			public BasePlayer player;
+			public IncursionEventGame.EventTeam eventTeam;
 
-            public GameStateManager(IncursionStateManager.IStateMachine initialState, string name) : base(initialState)
-            {
-                IemUtils.DLog("creating a game state manager in IncursionEventGame");
-                Name = name;
-                IncursionUI.CreateAdminBanner3("state:" + GetState().ToString());
-                //update the reference in this plugin to hold the gsm
-                incursionEventGame.gameStateManager = this;
-            }
+			//@todo should the Monobehaviour be applied to the Statemanager?
+			public PlayerStateManager psm;
 
-            public override void ChangeState(IncursionStateManager.IStateMachine newState)
-            {
-                base.ChangeState(newState);
-                IncursionUI.CreateAdminBanner3("state:" + GetState().ToString());
-                IemUtils.DLog("test");
-            }
+			public EventPlayer ()
+			{
+				IemUtils.DLog ("calling constructor in eventplayer monobehavior");
+				psm = new PlayerStateManager (this, PlayerUnknown.Instance);
+				IemUtils.DLog ("calling constructor2 in eventplayer monobehavior");
+				IemUtils.DLog ("psm is null " + psm.GetState ().ToString ());
 
-            public virtual void ReinitializeGame()
-            {
-                eg = new IncursionEventGame.EventGame(this);
+				if (psm == null)
+					IemUtils.DLog ("psm is null " + psm.ToString ());
+
+
+			}
+
+			public string PlayerId { get; set; }
+
+			public int Score { get; set; }
+
+			void Awake ()
+			{
+				IemUtils.DLog ("calling awake in eventplayer monobehavior");
+				player = GetComponent<BasePlayer> ();
+				psm.eventPlayer = this;
+
+			}
+		}
+
+
+
+		public class GameStateManager : IncursionStateManager.StateManager
+		{
+			public string Name { get; set; }
+
+			public IncursionEventGame.EventPlayer eventPlayer;
+			public IncursionEventGame.EventGame eg;
+			public IemUtils.ScheduledEvent nextEvent = null;
+
+			public GameStateManager (IncursionStateManager.IStateMachine initialState, string name) : base (initialState)
+			{
+				IemUtils.DLog ("creating a game state manager in IncursionEventGame");
+				Name = name;
+				IncursionUI.CreateGameStateManagerDebugBanner ("state:" + GetState ().ToString ());
+				//update the reference in this plugin to hold the gsm
+				//incursionEventGame.gameStateManager = this;
+			}
+
+			public override void ChangeState (IncursionStateManager.IStateMachine newState)
+			{
+				base.ChangeState (newState);
+				IncursionUI.CreateGameStateManagerDebugBanner ("state:" + GetState ().ToString ());
+				IemUtils.DLog ("test");
+			}
+
+			public virtual void ReinitializeGame ()
+			{
+				eg = new IncursionEventGame.EventGame (this);
             }
 
             public virtual void UnloadGame()
@@ -461,453 +457,460 @@ namespace Oxide.Plugins
                 throw new NotImplementedException();
             }
 
-        }
-
-        public class PlayerStateManager : IncursionStateManager.StateManager
-        {
-
-            public IncursionEventGame.EventGame eg;
-            public EventPlayer eventPlayer;
-
-            public PlayerStateManager(EventPlayer newEventPlayer, IncursionStateManager.IStateMachine initialState) : base(initialState)
+            public virtual void CancelGame()
             {
-                eventPlayer = newEventPlayer;
-                IemUtils.DDLog("creating the player state manager in PlayerStateManager");
-                Plugins.IemUtils.DDLog("state is " + GetState().ToString());
-                IncursionUI.CreateAdminBanner2(eventPlayer.player,
-                    "player state:" + GetState().ToString());
+                throw new NotImplementedException();
             }
 
-            // overridding the ChangeState in order to log the transition to somewhere specific
-            // and show the state change on the UI
-            public override void ChangeState(IncursionStateManager.IStateMachine newState)
-            {
-                base.ChangeState(newState);
-                IemUtils.DDLog("calling changeState in PlayerStateManager");
-                IncursionUI.CreateAdminBanner2(eventPlayer.player,
-                    "state:" + eventPlayer.psm.GetState().ToString());
-
-            }
-
+            
 
         }
 
+		public class PlayerStateManager : IncursionStateManager.StateManager
+		{
 
-        void OnEntityDeath(BaseCombatEntity victim, HitInfo info)
-        {
+			public IncursionEventGame.EventGame eg;
+			public EventPlayer eventPlayer;
 
-        }
+			public PlayerStateManager (EventPlayer newEventPlayer, IncursionStateManager.IStateMachine initialState) : base (initialState)
+			{
+				eventPlayer = newEventPlayer;
+				IemUtils.DDLog ("creating the player state manager in PlayerStateManager");
+				Plugins.IemUtils.DDLog ("state is " + GetState ().ToString ());
+				IncursionUI.CreatePlayerStateManagerDebugBanner (eventPlayer.player,
+					"player state:" + GetState ().ToString ());
+			}
 
-        #region player states
+			// overridding the ChangeState in order to log the transition to somewhere specific
+			// and show the state change on the UI
+			public override void ChangeState (IncursionStateManager.IStateMachine newState)
+			{
+				base.ChangeState (newState);
+				IemUtils.DDLog ("calling changeState in PlayerStateManager");
+				IncursionUI.CreatePlayerStateManagerDebugBanner (eventPlayer.player,
+					"state:" + eventPlayer.psm.GetState ().ToString ());
 
-        /// <summary>
-        /// Unknown - if a player is allocated to an event before having connect, their details
-        /// are unknown. But we want to be able to hold a spot for a player before joining
-        /// Disconnected - player has connected, but is not eligible for the lobby, or its not created yet
-        /// player has been allocated to team/event, but has not yet connected
-        /// players who are eligible to play, and have been moved to the pregame lobby
-        /// allocated to team, ready to start if solo game
-        /// playing, dead, sleeping
-        /// used to track players who disconnect during play
-        /// not sure if this is useful
-        /// 
-        /// </summary>
+			}
 
 
-        public class PlayerUnknown : IncursionStateManager.StateBase<PlayerUnknown>,
+		}
+
+
+		void OnEntityDeath (BaseCombatEntity victim, HitInfo info)
+		{
+
+		}
+
+		#region player states
+
+		/// <summary>
+		/// Unknown - if a player is allocated to an event before having connect, their details
+		/// are unknown. But we want to be able to hold a spot for a player before joining
+		/// Disconnected - player has connected, but is not eligible for the lobby, or its not created yet
+		/// player has been allocated to team/event, but has not yet connected
+		/// players who are eligible to play, and have been moved to the pregame lobby
+		/// allocated to team, ready to start if solo game
+		/// playing, dead, sleeping
+		/// used to track players who disconnect during play
+		/// not sure if this is useful
+		/// 
+		/// </summary>
+
+
+		public class PlayerUnknown : IncursionStateManager.StateBase<PlayerUnknown>,
             IncursionStateManager.IStateMachine
-        {
+		{
 
-        }
+		}
 
 
-        public class Disconnected : IncursionStateManager.StateBase<Disconnected>,
+		public class Disconnected : IncursionStateManager.StateBase<Disconnected>,
             IncursionStateManager.IStateMachine
-        {
+		{
 
-        }
+		}
 
-        //public class GetScheduledEventsUiObject()
-        //{
+		//public class GetScheduledEventsUiObject()
+		//{
 
-        //}
+		//}
 
-        //public class GetCurrentEventsUiObject()
-        //{
+		//public class GetCurrentEventsUiObject()
+		//{
 
-        //}
+		//}
 
-        void doHook()
-        {
-            Interface.Oxide.CallHook("OnInjectSchedulingInfos", "string");
-        }
+		void doHook ()
+		{
+			Interface.Oxide.CallHook ("OnInjectSchedulingInfos", "string");
+		}
 
-        public class PlayerInTeamSelectHUD : IncursionStateManager.StateBase<PlayerInTeamSelectHUD>,
+		public class PlayerInTeamSelectHUD : IncursionStateManager.StateBase<PlayerInTeamSelectHUD>,
             IncursionStateManager.IStateMachine
-        {
-            public new void Enter(IncursionStateManager.StateManager psm)
-            {
-                IemUtils.DLog("player is in PlayerInTeamSelectHUD");
+		{
+			public new void Enter (IncursionStateManager.StateManager psm)
+			{
+				IemUtils.DLog ("player is in PlayerInTeamSelectHUD");
 
-                BasePlayer player = ((PlayerStateManager)psm).
+				BasePlayer player = ((PlayerStateManager)psm).
                 eventPlayer.player;
-                IncursionUI.DisplayEnterLobbyUIHeader(player);
-                IncursionUI.DisplayEnterLobbyUIOpenLobby(player);
-                IemUtils.DLog("ret is ");
-                //massive hack to deal with how to get the scheduling infos
-                object returnval = Interface.Oxide.CallHook("OnInjectSchedulingInfos", player.UserIDString);
-                IemUtils.DLog("ret is "+ returnval);
-                //IemUtils.DLog("ret is " + ret.ToString());
-                IncursionUI.DisplayEnterLobbyUIScheduled(player, (IemUtils
+				IncursionUI.DisplayEnterLobbyUIHeader (player);
+				IncursionUI.DisplayEnterLobbyUIOpenLobby (player);
+				IemUtils.DLog ("ret is ");
+				//massive hack to deal with how to get the scheduling infos
+				object returnval = Interface.Oxide.CallHook ("OnInjectSchedulingInfos", player.UserIDString);
+				IemUtils.DLog ("ret is " + returnval);
+				//IemUtils.DLog("ret is " + ret.ToString());
+				IncursionUI.DisplayEnterLobbyUIScheduled (player, (IemUtils
                     .ScheduledEvent)returnval);
-            }
+			}
 
-            public new void Execute(IncursionStateManager.StateManager psm)
-            {
+			public new void Execute (IncursionStateManager.StateManager psm)
+			{
 
-                BasePlayer player = ((PlayerStateManager)psm).
+				BasePlayer player = ((PlayerStateManager)psm).
                 eventPlayer.player;
-                CuiHelper.DestroyUi(player, "DisplayEnterLobbyUIHeader");
-                CuiHelper.DestroyUi(player, "DisplayEnterLobbyUIOpenLobby");
-                CuiHelper.DestroyUi(player, "DisplayEnterLobbyUIScheduled");
+				CuiHelper.DestroyUi (player, "DisplayEnterLobbyUIHeader");
+				CuiHelper.DestroyUi (player, "DisplayEnterLobbyUIOpenLobby");
+				CuiHelper.DestroyUi (player, "DisplayEnterLobbyUIScheduled");
 
-            }
+			}
 
-            public new void Exit(IncursionStateManager.StateManager psm)
-            {
-                BasePlayer player = ((PlayerStateManager)psm).
+			public new void Exit (IncursionStateManager.StateManager psm)
+			{
+				BasePlayer player = ((PlayerStateManager)psm).
                 eventPlayer.player;
-                CuiHelper.DestroyUi(player, "DisplayEnterLobbyUIHeader");
-                CuiHelper.DestroyUi(player, "DisplayEnterLobbyUIOpenLobby");
-                CuiHelper.DestroyUi(player, "DisplayEnterLobbyUIScheduled");
-            }
-        }
+				CuiHelper.DestroyUi (player, "DisplayEnterLobbyUIHeader");
+				CuiHelper.DestroyUi (player, "DisplayEnterLobbyUIOpenLobby");
+				CuiHelper.DestroyUi (player, "DisplayEnterLobbyUIScheduled");
+			}
+		}
 
-        public class PlayerInEventLobbyNoGame : IncursionStateManager.StateBase<PlayerInEventLobbyNoGame>,
+		public class PlayerInEventLobbyNoGame : IncursionStateManager.StateBase<PlayerInEventLobbyNoGame>,
             IncursionStateManager.IStateMachine
-        {
-            public new void Enter(IncursionStateManager.StateManager psm)
-            {
-                IemUtils.DLog("player is in the event Lobby, no game");
+		{
+			public new void Enter (IncursionStateManager.StateManager psm)
+			{
+				IemUtils.DLog ("player is in the event Lobby, no game");
 
-                BasePlayer player = ((PlayerStateManager)psm).
+				BasePlayer player = ((PlayerStateManager)psm).
                 eventPlayer.player;
 
-            }
+			}
 
-        }
+		}
 
 
-        public class PlayerInEventLobby : IncursionStateManager.StateBase<PlayerInEventLobby>,
+		public class PlayerInEventLobby : IncursionStateManager.StateBase<PlayerInEventLobby>,
             IncursionStateManager.IStateMachine
-        {
-            public new void Enter(IncursionStateManager.StateManager psm)
-            {
-                BasePlayer player = ((PlayerStateManager)psm).
+		{
+			public new void Enter (IncursionStateManager.StateManager psm)
+			{
+				BasePlayer player = ((PlayerStateManager)psm).
 eventPlayer.player;
-                EventPlayer eventPlayer = ((PlayerStateManager)psm).
+				EventPlayer eventPlayer = ((PlayerStateManager)psm).
                 eventPlayer;
-                IemUtils.DLog("player is entering the PlayerInEventLobby");
+				IemUtils.DLog ("player is entering the PlayerInEventLobby");
 
 
-                IncursionUI.ShowTeamUiForPlayer(player, eventPlayer.psm.eg.ConvertTeamsToDict());
-            }
-            public new void Exit(IncursionStateManager.StateManager psm)
-            {
-                IemUtils.DLog("player is leaving the PlayerInEventLobby");
-                EventPlayer eventPlayer = ((PlayerStateManager)psm).
+				IncursionUI.ShowTeamUiForPlayer (player, eventPlayer.psm.eg.ConvertTeamsToDict ());
+			}
+
+			public new void Exit (IncursionStateManager.StateManager psm)
+			{
+				IemUtils.DLog ("player is leaving the PlayerInEventLobby");
+				EventPlayer eventPlayer = ((PlayerStateManager)psm).
                 eventPlayer;
-                IncursionUI.RemoveTeamUIForPlayer(eventPlayer.player);
-            }
-        }
+				IncursionUI.RemoveTeamUIForPlayer (eventPlayer.player);
+			}
+		}
 
-        public class PlayerInEventLobbyNoTeam : IncursionStateManager.StateBase<PlayerInEventLobbyNoTeam>,
+		public class PlayerInEventLobbyNoTeam : IncursionStateManager.StateBase<PlayerInEventLobbyNoTeam>,
             IncursionStateManager.IStateMachine
-        {
-            public new void Enter(IncursionStateManager.StateManager psm)
-            {
-                BasePlayer player = ((PlayerStateManager)psm).
+		{
+			public new void Enter (IncursionStateManager.StateManager psm)
+			{
+				BasePlayer player = ((PlayerStateManager)psm).
 eventPlayer.player;
-                EventPlayer eventPlayer = ((PlayerStateManager)psm).
+				EventPlayer eventPlayer = ((PlayerStateManager)psm).
                 eventPlayer;
-                IemUtils.DLog("player is entering the PlayerInEventLobbyNoTeam");
+				IemUtils.DLog ("player is entering the PlayerInEventLobbyNoTeam");
 
 
 
-                IncursionUI.ShowTeamUiForPlayer(player,
-                    eventPlayer.psm.eg.ConvertTeamsToDict());
-            }
+				IncursionUI.ShowTeamUiForPlayer (player,
+					eventPlayer.psm.eg.ConvertTeamsToDict ());
+			}
 
-            public new void Exit(IncursionStateManager.StateManager psm)
-            {
-                IemUtils.DLog("player is leaving the EventLobbyNoTeam");
-                EventPlayer eventPlayer = ((PlayerStateManager)psm).eventPlayer;
-                IncursionUI.RemoveTeamUIForPlayer(eventPlayer.player);
-            }
-        }
+			public new void Exit (IncursionStateManager.StateManager psm)
+			{
+				IemUtils.DLog ("player is leaving the EventLobbyNoTeam");
+				EventPlayer eventPlayer = ((PlayerStateManager)psm).eventPlayer;
+				IncursionUI.RemoveTeamUIForPlayer (eventPlayer.player);
+			}
+		}
 
-        public class PlayerInEventLobbyTeamed : IncursionStateManager.StateBase<PlayerInEventLobbyTeamed>,
+		public class PlayerInEventLobbyTeamed : IncursionStateManager.StateBase<PlayerInEventLobbyTeamed>,
             IncursionStateManager.IStateMachine
-        {
-            public new void Enter(IncursionStateManager.StateManager psm)
-            {
+		{
+			public new void Enter (IncursionStateManager.StateManager psm)
+			{
 
-                IemUtils.DLog("player is EventLobbyTeamed");
-                BasePlayer player = ((PlayerStateManager)psm).
+				IemUtils.DLog ("player is EventLobbyTeamed");
+				BasePlayer player = ((PlayerStateManager)psm).
                 eventPlayer.player;
-                EventPlayer eventPlayer = ((PlayerStateManager)psm).
+				EventPlayer eventPlayer = ((PlayerStateManager)psm).
                 eventPlayer;
 
-                IemUtils.BroadcastChat("player " + player.displayName
-                    + " has joined team " + eventPlayer.eventTeam.TeamName);
+				IemUtils.BroadcastChat ("player " + player.displayName
+				+ " has joined team " + eventPlayer.eventTeam.TeamName);
 
 
-                IncursionUI.ShowTeamUi(eventPlayer.psm.eg.ConvertTeamsToDict());
+				IncursionUI.ShowTeamUi (eventPlayer.psm.eg.ConvertTeamsToDict ());
 
-                Interface.Oxide.CallHook("OnPlayerAddedToTeam", eventPlayer.eventTeam, player);
-            }
-            public new void Exit(IncursionStateManager.StateManager psm)
-            {
-                IemUtils.DLog("player is leaving EventLobbyTeamed");
-                EventPlayer eventPlayer = ((PlayerStateManager)psm).
+				Interface.Oxide.CallHook ("OnPlayerAddedToTeam", eventPlayer.eventTeam, player);
+			}
+
+			public new void Exit (IncursionStateManager.StateManager psm)
+			{
+				IemUtils.DLog ("player is leaving EventLobbyTeamed");
+				EventPlayer eventPlayer = ((PlayerStateManager)psm).
                 eventPlayer;
-                IncursionUI.RemoveTeamUIForPlayer(eventPlayer.player);
-            }
-        }
+				IncursionUI.RemoveTeamUIForPlayer (eventPlayer.player);
+			}
+		}
 
 
-        public class PlayerInEventLobbySolo : IncursionStateManager.StateBase<PlayerInEventLobbySolo>,
+		public class PlayerInEventLobbySolo : IncursionStateManager.StateBase<PlayerInEventLobbySolo>,
             IncursionStateManager.IStateMachine
-        {
-            public new void Enter(IncursionStateManager.StateManager psm)
-            {
-                IemUtils.DLog("player is EventLobbySolo");
+		{
+			public new void Enter (IncursionStateManager.StateManager psm)
+			{
+				IemUtils.DLog ("player is EventLobbySolo");
 
-                BasePlayer player = ((PlayerStateManager)psm).
+				BasePlayer player = ((PlayerStateManager)psm).
                 eventPlayer.player;
 
-            }
-        }
+			}
+		}
 
-        public class PlayerInGameLobby : IncursionStateManager.StateBase<PlayerInGameLobby>,
+		public class PlayerInGameLobby : IncursionStateManager.StateBase<PlayerInGameLobby>,
             IncursionStateManager.IStateMachine
-        {
-            public new void Enter(IncursionStateManager.StateManager psm)
-            {
-                IemUtils.DLog("player is PlayerInGameLobby");
+		{
+			public new void Enter (IncursionStateManager.StateManager psm)
+			{
+				IemUtils.DLog ("player is PlayerInGameLobby");
 
-                BasePlayer player = ((PlayerStateManager)psm).
+				BasePlayer player = ((PlayerStateManager)psm).
                 eventPlayer.player;
 
-            }
-        }
+			}
+		}
 
 
-        public class PlayerInGame : IncursionStateManager.StateBase<PlayerInGame>,
+		public class PlayerInGame : IncursionStateManager.StateBase<PlayerInGame>,
             IncursionStateManager.IStateMachine
-        {
-            public new void Enter(IncursionStateManager.StateManager psm)
-            {
-                IemUtils.DLog("player is PlayerInGame");
+		{
+			public new void Enter (IncursionStateManager.StateManager psm)
+			{
+				IemUtils.DLog ("player is PlayerInGame");
 
-                BasePlayer player = ((PlayerStateManager)psm).
+				BasePlayer player = ((PlayerStateManager)psm).
                 eventPlayer.player;
 
-            }
-        }
+			}
+		}
 
 
-        public class PlayerInGameTeamed : IncursionStateManager.StateBase<PlayerInGameTeamed>,
+		public class PlayerInGameTeamed : IncursionStateManager.StateBase<PlayerInGameTeamed>,
             IncursionStateManager.IStateMachine
-        {
-            public new void Enter(IncursionStateManager.StateManager psm)
-            {
-                IemUtils.DLog("player is PlayerInGameTeamed");
+		{
+			public new void Enter (IncursionStateManager.StateManager psm)
+			{
+				IemUtils.DLog ("player is PlayerInGameTeamed");
 
-                BasePlayer player = ((PlayerStateManager)psm).
+				BasePlayer player = ((PlayerStateManager)psm).
                 eventPlayer.player;
 
-            }
-        }
+			}
+		}
 
-        static System.Random rnd = new System.Random();
+		static System.Random rnd = new System.Random ();
 
-        static void MovePlayerToEsmLobby(BasePlayer player)
-        {
-            IemUtils.DLog("moving player to esm lobby in IemEventGame");
+		static void MovePlayerToEsmLobby (BasePlayer player)
+		{
+			IemUtils.DLog ("moving player to esm lobby in IemEventGame");
 
 
 
-            //@todo move this to the game definition
-            Vector3 loc = new Vector3(-236, 3, 18);
-            float radius = 9f;
-            loc = IemUtils.GetRandomPointOnCircle(loc, radius);
-            IemUtils.MovePlayerTo(player, loc);
-            IemUtils.SetMetabolismValues(player);
-        }
+			//@todo move this to the game definition
+			Vector3 loc = new Vector3 (-236, 3, 18);
+			float radius = 9f;
+			loc = IemUtils.GetRandomPointOnCircle (loc, radius);
+			IemUtils.MovePlayerTo (player, loc);
+			IemUtils.SetMetabolismValues (player);
+		}
 
-        public class PlayerWaiting : IncursionStateManager.StateBase<PlayerWaiting>,
+		public class PlayerWaiting : IncursionStateManager.StateBase<PlayerWaiting>,
             IncursionStateManager.IStateMachine
-        {
-            public new void Enter(IncursionStateManager.StateManager psm)
-            {
-                IemUtils.DLog("player is PlayerWaiting");
+		{
+			public new void Enter (IncursionStateManager.StateManager psm)
+			{
+				IemUtils.DLog ("player is PlayerWaiting");
 
 
 
-                BasePlayer player = ((PlayerStateManager)psm).
+				BasePlayer player = ((PlayerStateManager)psm).
                 eventPlayer.player;
 
-                if (!(bool)incursionEventGame.ZoneManager.Call("isPlayerInZone", "lobby", player))
-                    MovePlayerToEsmLobby(player);
+				if (!(bool)incursionEventGame.ZoneManager.Call ("isPlayerInZone", "lobby", player))
+					MovePlayerToEsmLobby (player);
 
-            }
-        }
+			}
+		}
 
-        public abstract class PlayerStateBase<T> where T : IncursionStateManager.StateBase<T>,
+		public abstract class PlayerStateBase<T> where T : IncursionStateManager.StateBase<T>,
             IncursionStateManager.IStateMachine, new()
-        {
-        }
+		{
+		}
 
-        public class PlayerInGameTeamedDead : IncursionStateManager.StateBase<PlayerInGameTeamedDead>,
+		public class PlayerInGameTeamedDead : IncursionStateManager.StateBase<PlayerInGameTeamedDead>,
             IncursionStateManager.IStateMachine
-        {
-            public new void Enter(IncursionStateManager.StateManager psm)
-            {
-                base.Enter(psm);
+		{
+			public new void Enter (IncursionStateManager.StateManager psm)
+			{
+				base.Enter (psm);
 
 
-            }
-        }
+			}
+		}
 
-        public class PlayerInGameSolo : IncursionStateManager.StateBase<PlayerInGameSolo>,
+		public class PlayerInGameSolo : IncursionStateManager.StateBase<PlayerInGameSolo>,
             IncursionStateManager.IStateMachine
-        {
-            public new void Enter(IncursionStateManager.StateManager psm)
-            {
-                IemUtils.DLog("player is PlayerInGameSolo");
+		{
+			public new void Enter (IncursionStateManager.StateManager psm)
+			{
+				IemUtils.DLog ("player is PlayerInGameSolo");
 
-                BasePlayer player = ((PlayerStateManager)psm).
+				BasePlayer player = ((PlayerStateManager)psm).
                 eventPlayer.player;
 
-            }
-        }
+			}
+		}
 
-        public class PlayerInPostGame : IncursionStateManager.StateBase<PlayerInPostGame>,
+		public class PlayerInPostGame : IncursionStateManager.StateBase<PlayerInPostGame>,
             IncursionStateManager.IStateMachine
-        {
-            public new void Enter(IncursionStateManager.StateManager psm)
-            {
-                IemUtils.DLog("player is PlayerInPostGame");
+		{
+			public new void Enter (IncursionStateManager.StateManager psm)
+			{
+				IemUtils.DLog ("player is PlayerInPostGame");
 
-                BasePlayer player = ((PlayerStateManager)psm).
+				BasePlayer player = ((PlayerStateManager)psm).
                 eventPlayer.player;
 
-            }
-        }
+			}
+		}
 
-        #endregion
-
-
-
-        public static EventPlayer GetEventPlayer(BasePlayer player)
-        {
-            Plugins.IemUtils.DLog(player.UserIDString);
-            EventPlayer eventPlayer
-               = player.GetComponent<EventPlayer>();
-            if (eventPlayer == null)
-            {
-                IemUtils.DLog("creating eventPlayer");
-
-                eventPlayer = player.gameObject.AddComponent<EventPlayer>();
-                eventPlayer.PlayerId = player.UserIDString;
-                eventPlayer.player = player;
-            }
-            return eventPlayer;
-        }
+		#endregion
 
 
-        public class EventTeam
-        {
-            public EventTeam(string teamId,
-                string teamName,
-                Vector3 teamLocation,
-                string colour = "white")
-            {
-                TeamId = TeamId;
-                TeamName = teamName;
-                Colour = colour;
-                Location = teamLocation;
-            }
-            public string TeamName { get; set; }
-            public string TeamId { get; set; }
-            public string Colour { get; set; }
-            public Vector3 Location { get; set; }
-            public int Score { get; set; }
-            public Dictionary<string, EventPlayer> teamPlayers
-                = new Dictionary<string, EventPlayer>();
-        }
 
-        //@todo add checks for game state
-        void OnEntityTakeDamage(BaseCombatEntity entity, HitInfo hitinfo)
-        {
-            try
-            {
-                if (entity is ReactiveTarget && hitinfo.Initiator is BasePlayer)
-                {
+		public static EventPlayer GetEventPlayer (BasePlayer player)
+		{
+			Plugins.IemUtils.DLog (player.UserIDString);
+			EventPlayer eventPlayer
+               = player.GetComponent<EventPlayer> ();
+			if (eventPlayer == null) {
+				IemUtils.DLog ("creating eventPlayer");
 
-                    var target = (ReactiveTarget)entity;
-                    var attacker = (BasePlayer)hitinfo.Initiator;
-                    if (entity != null && attacker != null)
-                    {
-                        if (hitinfo.HitBone == StringPool.Get("target_collider_bullseye"))
-                        {
-                        }
-                        if (target.IsKnockedDown())
-                        {
-                            //Puts ("target maxHealth is " + target.MaxHealth ().ToString ());
-                            target.CancelInvoke("ResetTarget");
-                            //Puts ("target health is " + target.Health ().ToString ());
-                            target.health = target.MaxHealth();
-                            //target.ChangeHealth (target.MaxHealth ());
-                            //Puts ("target health is " + target.Health ().ToString ());
-                            target.SendNetworkUpdate();
-                            //timer.Once (time, () => target.SetFlag (BaseEntity.Flags.On, true));
-
-                            EventPlayer eventPlayer = GetEventPlayer(attacker);
-
-                            eventPlayer.Score += 1;
-
-                        }
+				eventPlayer = player.gameObject.AddComponent<EventPlayer> ();
+				eventPlayer.PlayerId = player.UserIDString;
+				eventPlayer.player = player;
+			}
+			return eventPlayer;
+		}
 
 
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                Puts("exception");
-            }
-        }
+		public class EventTeam
+		{
+			public EventTeam (string teamId,
+			                          string teamName,
+			                          Vector3 teamLocation,
+			                          string colour = "white")
+			{
+				TeamId = TeamId;
+				TeamName = teamName;
+				Colour = colour;
+				Location = teamLocation;
+			}
+
+			public string TeamName { get; set; }
+
+			public string TeamId { get; set; }
+
+			public string Colour { get; set; }
+
+			public Vector3 Location { get; set; }
+
+			public int Score { get; set; }
+
+			public Dictionary<string, EventPlayer> teamPlayers
+                = new Dictionary<string, EventPlayer> ();
+		}
+
+		//@todo add checks for game state
+		void OnEntityTakeDamage (BaseCombatEntity entity, HitInfo hitinfo)
+		{
+			try {
+				if (entity is ReactiveTarget && hitinfo.Initiator is BasePlayer) {
+
+					var target = (ReactiveTarget)entity;
+					var attacker = (BasePlayer)hitinfo.Initiator;
+					if (entity != null && attacker != null) {
+						if (hitinfo.HitBone == StringPool.Get ("target_collider_bullseye")) {
+						}
+						if (target.IsKnockedDown ()) {
+							//Puts ("target maxHealth is " + target.MaxHealth ().ToString ());
+							target.CancelInvoke ("ResetTarget");
+							//Puts ("target health is " + target.Health ().ToString ());
+							target.health = target.MaxHealth ();
+							//target.ChangeHealth (target.MaxHealth ());
+							//Puts ("target health is " + target.Health ().ToString ());
+							target.SendNetworkUpdate ();
+							//timer.Once (time, () => target.SetFlag (BaseEntity.Flags.On, true));
+
+							EventPlayer eventPlayer = GetEventPlayer (attacker);
+
+							eventPlayer.Score += 1;
+
+						}
 
 
-        //from em
-        [ConsoleCommand("gx")]
-        void ccmdEvent(ConsoleSystem.Arg arg)
-        {
+					}
+				}
+			} catch (Exception ex) {
+				Puts ("exception");
+			}
+		}
 
-            if (!IemUtils.hasAccess(arg)) return;
-            switch (arg.Args[0].ToLower())
-            {
-                case "state":
-                    SendReply(arg, incursionEventGame.gameStateManager.GetState().ToString());
-                    return;
-                case "player":
-                    EventPlayer eventPlayer = GetEventPlayer(arg.Player());
-                    SendReply(arg, eventPlayer.psm.GetState().ToString());
-                    return;
-            }
-        }
 
-    }
+		//from em
+		[ConsoleCommand ("gx")]
+		void ccmdEvent (ConsoleSystem.Arg arg)
+		{
+
+			if (!IemUtils.hasAccess (arg))
+				return;
+			switch (arg.Args [0].ToLower ()) {
+			case "state":
+			//	SendReply (arg, incursionEventGame.gameStateManager.GetState ().ToString ());
+				return;
+			case "player":
+				EventPlayer eventPlayer = GetEventPlayer (arg.Player ());
+				SendReply (arg, eventPlayer.psm.GetState ().ToString ());
+				return;
+			}
+		}
+
+	}
 }

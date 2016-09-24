@@ -491,33 +491,34 @@ namespace Oxide.Plugins
             var door = entity as Door;
             if (door != null)
             {
-                IemUtils.DLog("test " + entity.GetType());
+               // IemUtils.DLog("test " + entity.GetType());
 
-                IemUtils.DLog(door.gameObject.name);
+               // IemUtils.DLog(door.gameObject.name);
 
-                IemUtils.DLog(door.transform.position.ToString());
-                IemUtils.DLog(door.gameObject.transform.position.ToString());
+               // IemUtils.DLog(door.transform.position.ToString());
+               // IemUtils.DLog(door.gameObject.transform.position.ToString());
 
-                IemUtils.DLog(hitinfo.Weapon.LookupPrefab().name);
-                if (hitinfo.Weapon.LookupPrefab().name == "bone_club.entity")
+                if (hitinfo.Weapon != null)
                 {
-                    TeamLobbyDoor teamLobbyDoor = new TeamLobbyDoor(door.transform.position);
-                    teamLobbyDoor.team = "red";
-                    storedData.TeamLobbyDoors.Remove(teamLobbyDoor);
-                    storedData.TeamLobbyDoors.Add(teamLobbyDoor);
-                    teamLobbyDoors[door.transform.position] = teamLobbyDoor;
-                    SaveData();
+                    if (hitinfo.Weapon.LookupPrefab().name == "bone_club.entity")
+                    {
+                        TeamLobbyDoor teamLobbyDoor = new TeamLobbyDoor(door.transform.position);
+                        teamLobbyDoor.team = "red";
+                        storedData.TeamLobbyDoors.Remove(teamLobbyDoor);
+                        storedData.TeamLobbyDoors.Add(teamLobbyDoor);
+                        teamLobbyDoors[door.transform.position] = teamLobbyDoor;
+                        SaveData();
+                    }
+                    if (hitinfo.Weapon.LookupPrefab().name == "knife_bone.entity")
+                    {
+                        TeamLobbyDoor teamLobbyDoor = new TeamLobbyDoor(door.transform.position);
+                        teamLobbyDoor.team = "blue";
+                        storedData.TeamLobbyDoors.Remove(teamLobbyDoor);
+                        storedData.TeamLobbyDoors.Add(teamLobbyDoor);
+                        teamLobbyDoors[door.transform.position] = teamLobbyDoor;
+                        SaveData();
+                    }
                 }
-                if (hitinfo.Weapon.LookupPrefab().name == "knife_bone.entity")
-                {
-                    TeamLobbyDoor teamLobbyDoor = new TeamLobbyDoor(door.transform.position);
-                    teamLobbyDoor.team = "blue";
-                    storedData.TeamLobbyDoors.Remove(teamLobbyDoor);
-                    storedData.TeamLobbyDoors.Add(teamLobbyDoor);
-                    teamLobbyDoors[door.transform.position] = teamLobbyDoor;
-                    SaveData();
-                }
-
                 IemUtils.DLog(teamLobbyDoors.Count.ToString());
                 foreach (KeyValuePair<Vector3, TeamLobbyDoor> pair in teamLobbyDoors)
                 {

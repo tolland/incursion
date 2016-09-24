@@ -16,9 +16,9 @@ namespace Oxide.Plugins
 
         [PluginReference]
         Plugin ZoneManager;
-		static Oxide.Game.Rust.Libraries.Rust rust = GetLibrary<Oxide.Game.Rust.Libraries.Rust>();
-		static FieldInfo monumentsField = typeof(TerrainPath).GetField("Monuments", (BindingFlags.Public | BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
-		public static List<MonumentInfo> monuments = new List<MonumentInfo>();
+        static Oxide.Game.Rust.Libraries.Rust rust = GetLibrary<Oxide.Game.Rust.Libraries.Rust>();
+        static FieldInfo monumentsField = typeof(TerrainPath).GetField("Monuments", (BindingFlags.Public | BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
+        public static List<MonumentInfo> monuments = new List<MonumentInfo>();
 
         static IemUtils iemUtils = null;
 
@@ -53,7 +53,7 @@ namespace Oxide.Plugins
             player.metabolism.hydration.max = 250;
             player.metabolism.hydration.value = 250;
 
-            
+
         }
 
 
@@ -65,7 +65,7 @@ namespace Oxide.Plugins
             player.metabolism.hydration.value = 250;
         }
 
-        
+
 
         #endregion
 
@@ -119,6 +119,12 @@ namespace Oxide.Plugins
         public static void DDLog(string message)
         {
             ConVar.Server.Log("oxide/logs/DDlog.txt", message);
+            //iemUtils.Puts(message);
+        }
+
+        public static void SchLog(string message)
+        {
+            ConVar.Server.Log("oxide/logs/schedlog.txt", message);
             //iemUtils.Puts(message);
         }
 
@@ -274,13 +280,13 @@ namespace Oxide.Plugins
 
         public static void MovePlayerTo(BasePlayer player, Vector3 loc)
         {
-			if (player.inventory.loot.IsLooting())
+            if (player.inventory.loot.IsLooting())
             {
                 player.EndLooting();
             }
-			player.CancelInvoke("InventoryUpdate");
+            player.CancelInvoke("InventoryUpdate");
             player.inventory.crafting.CancelAll(true);
-	        rust.ForcePlayerPosition(player, loc.x, loc.y, loc.z);
+            rust.ForcePlayerPosition(player, loc.x, loc.y, loc.z);
             player.SendNetworkUpdateImmediate();
         }
 
@@ -288,7 +294,7 @@ namespace Oxide.Plugins
 
         public static Vector3 GetRandomPointOnCircle(Vector3 centre, float radius)
         {
-            
+
             //get a random angli in radians
             float randomAngle = (float)random.NextDouble() * (float)Math.PI * 2.0f;
 
@@ -318,49 +324,194 @@ namespace Oxide.Plugins
 
         #endregion
 
+
+        #region scheduled event global
+
+        public Dictionary<Guid, IemUtils.ScheduledEvent> scheduledEvents =
+    new Dictionary<Guid, IemUtils.ScheduledEvent>();
+
         public class ScheduledEvent
         {
             public DateTime Start { get; set; }
             DateTime End;   // ??
             public int Length { get; set; }
-            public List<ScheduledEventTeam> seTeam = new List<ScheduledEventTeam>();
-            public List<ScheduledEventPlayer> sePlayer = new List<ScheduledEventPlayer>();
+            public Dictionary<Guid, ScheduledEventTeam> schTeams = new Dictionary<Guid, ScheduledEventTeam>();
+            public Dictionary<Guid, ScheduledEventPlayer> schPlayers = new Dictionary<Guid, ScheduledEventPlayer>();
+            public Guid guid;
+            public string EventName { get; set; }
 
             public ScheduledEvent(DateTime newStart, int newLength)
             {
                 Start = newStart;
                 Length = newLength;
+                guid = Guid.NewGuid();
+                EventName = "Default Name";
+            }
+
+            public ScheduledEventTeam GetTeam(string teamId)
+            {
+                foreach (var teamsValue in schTeams.Values)
+                {
+                    if (teamsValue.TeamId == teamId)
+                    {
+                        return teamsValue;
+                    }
+                }
+                return null;
+            }
+
+            public ScheduledEventPlayer GetPlayer(string steamId)
+            {
+                foreach (var eplayer in schPlayers.Values)
+                {
+                    if (eplayer.steamId == steamId)
+                    {
+                        return eplayer;
+                    }
+                }
+                return null;
+            }
+
+
+
+
+            public ScheduledEvent(DateTime newStart, int newLength, string newEventName)
+            {
+                Start = newStart;
+                Length = newLength;
+                guid = Guid.NewGuid();
+                EventName = newEventName;
+            }
+
+            //public ScheduledEvent(DateTime newStart, int newLength, Guid newGuid)
+            //{
+            //    Start = newStart;
+            //    Length = newLength;
+            //    guid = newGuid;
+            //    EventName = "Default Name";
+            //}
+
+            public ScheduledEvent(DateTime newStart, int newLength, Guid newGuid, string newEventName)
+            {
+                Start = newStart;
+                Length = newLength;
+                guid = newGuid;
+                EventName = newEventName;
             }
 
             public class ScheduledEventTeam
             {
                 public string TeamName { get; set; }
+                public string TeamId { get; set; }
                 public string Color { get; set; }
-                public List<ScheduledEventPlayer> sePlayer = new List<ScheduledEventPlayer>();
+                public Dictionary<Guid, ScheduledEventPlayer> schPlayers = new Dictionary<Guid, ScheduledEventPlayer>();
                 public string JoinCommand { get; set; }
                 public bool TeamOpen { get; set; }
+                public ScheduledEvent scheduledEvent { get; set; }
+                public string AnchorMin = "";
+                public string AnchorMax = "";
+                public Guid guid;
 
-                public ScheduledEventTeam(string newTeamName, 
-                    string newColor, 
+                // create a team anew
+                public ScheduledEventTeam(
+                    string newTeamName,
+                    string newColor,
                     string newJoinCommand,
-                    bool newTeamOpen)
+                    bool newTeamOpen,
+                    ScheduledEvent obj
+                    )
                 {
                     TeamName = newTeamName;
+                    TeamId = "team_" + newColor;
                     Color = newColor;
                     JoinCommand = newJoinCommand;
                     TeamOpen = newTeamOpen;
+                    scheduledEvent = obj;
+                    guid = Guid.NewGuid();
+                    scheduledEvent.schTeams[guid] = this;
+                }
+
+                // recreating a team from the database
+                public ScheduledEventTeam(
+                    string newTeamName,
+                    string newColor,
+                    string newJoinCommand,
+                    bool newTeamOpen,
+                    ScheduledEvent obj,
+                    Guid newGuid)
+                {
+                    TeamName = newTeamName;
+                    Color = newColor;
+                    TeamId = "team_" + newColor;
+                    JoinCommand = newJoinCommand;
+                    TeamOpen = newTeamOpen;
+                    scheduledEvent = obj;
+                    scheduledEvent.schTeams[newGuid] = this;
+                    guid = newGuid;
                 }
             }
 
             public class ScheduledEventPlayer
             {
                 public string steamId { get; set; }
+                public string DisplayName { get; set; }
+                public ScheduledEventTeam schTeam;
+                public ScheduledEvent schEvent { get; set; }
+                public Guid guid;
 
-                public ScheduledEventPlayer(string newSteamid)
+                //not sure this is being called
+                //public ScheduledEventPlayer(string newSteamid)
+                //{
+                //    steamId = newSteamid;
+                //    guid = Guid.NewGuid();
+                //}
+
+                /// <summary>
+                /// probably being created during a player register for a future event in game
+                /// know event, but don't have a guid
+                /// </summary>
+                /// <param name="newSteamid"></param>
+                /// <param name="newSchEvent"></param>
+                public ScheduledEventPlayer(string newSteamid, ScheduledEventTeam newSchEventTeam)
                 {
                     steamId = newSteamid;
+                    DisplayName = newSteamid; //for something to display if this isn't set
+                    schEvent = newSchEventTeam.scheduledEvent;
+                    guid = Guid.NewGuid();
+                    schEvent.schTeams[newSchEventTeam.guid].schPlayers[guid] = this;
+                    schEvent.schPlayers[guid] = this;
+                }
+
+                public ScheduledEventPlayer(string newSteamid, ScheduledEvent newSchEvent)
+                {
+                    steamId = newSteamid;
+                    DisplayName = newSteamid; //for something to display if this isn't set
+                    schEvent = newSchEvent;
+                    guid = Guid.NewGuid();
+                    schEvent.schPlayers[guid] = this;
+                }
+
+                public ScheduledEventPlayer(string newSteamid, ScheduledEvent newSchEvent, Guid newGuid)
+                {
+                    steamId = newSteamid;
+                    DisplayName = newSteamid; //for something to display if this isn't set
+                    schEvent = newSchEvent;
+                    guid = newGuid;
+                    schEvent.schPlayers[guid] = this;
+                }
+
+                public ScheduledEventPlayer(string newSteamid, ScheduledEventTeam newSchEventTeam, Guid newGuid)
+                {
+                    steamId = newSteamid;
+                    DisplayName = newSteamid; //for something to display if this isn't set
+                    schEvent = newSchEventTeam.scheduledEvent;
+                    guid = newGuid;
+                    schEvent.schPlayers[guid] = this;
+                    schEvent.schTeams[newSchEventTeam.guid].schPlayers[guid] = this;
                 }
             }
         }
+
+        #endregion
     }
 }
