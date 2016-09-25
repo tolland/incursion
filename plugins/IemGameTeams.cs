@@ -166,7 +166,10 @@ namespace Oxide.Plugins
 
         #region Game states
 
-
+        private void OnPlayerDisconnected(BasePlayer player)
+        {
+            IemUtils.DLog("player disconnected in IemGameTeams");
+        }
 
         /// <summary>
         /// this represents the stage before a specific game implementation has been
@@ -179,6 +182,7 @@ namespace Oxide.Plugins
             public new void Enter(IncursionStateManager.StateManager gsm)
             {
 
+                iemGameTeams.Unsubscribe(nameof(OnPlayerDisconnected));
                 iemGameTeams.Unsubscribe(nameof(OnPlayerRespawn));
             }
         }
@@ -192,6 +196,7 @@ namespace Oxide.Plugins
             public new void Enter(IncursionStateManager.StateManager gsm)
             {
                 //IemUtils.DLog ("entry in GameEventLoaded");
+
             }
 
             public new void

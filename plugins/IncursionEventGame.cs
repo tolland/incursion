@@ -40,7 +40,9 @@ namespace Oxide.Plugins
 		void Loaded ()
 		{
 			IemUtils.LogL ("IncursionEventGame: server loaded complete");
-		}
+
+
+        }
 
 		void Unload ()
 		{
@@ -271,8 +273,41 @@ namespace Oxide.Plugins
 
 
 
+            public bool RemovePlayerFromTeams(BasePlayer player)
+            {
+                IemUtils.DLog("calling remove player from teams");
+                //If the BasePlayer is a new connection
+                EventPlayer eventPlayer
+                    = GetEventPlayer(player);
+                return RemovePlayerFromTeams(eventPlayer);
+            }
 
-			public bool AddPlayerToTeam (BasePlayer player, EventTeam team)
+            public bool RemovePlayerFromTeams(EventPlayer eventPlayer)
+            {
+                IemUtils.DLog("calling remove player from teams");
+
+                if (gamePlayers.ContainsKey(eventPlayer.PlayerId))
+                    gamePlayers.Remove(eventPlayer.PlayerId);
+
+                foreach (var eventTeam in eventTeams.Values)
+                {
+                    if (eventTeam.teamPlayers.ContainsKey(eventPlayer.PlayerId))
+                    {
+                        eventTeam.teamPlayers.Remove(eventPlayer.PlayerId);
+                    }
+                }
+
+                if (eventPlayer.eventTeam != null)
+                {
+                    if (eventPlayer.eventTeam.teamPlayers.ContainsKey(eventPlayer.PlayerId))
+                        eventPlayer.eventTeam.teamPlayers.Remove(eventPlayer.PlayerId);
+                }
+
+                eventPlayer.psm.ChangeState(PlayerInEventLobbyNoTeam.Instance);
+                return true;
+            }
+
+            public bool AddPlayerToTeam (BasePlayer player, EventTeam team)
 			{
 				IemUtils.DLog ("calling add player to team");
 				//If the BasePlayer is a new connection
@@ -516,7 +551,8 @@ namespace Oxide.Plugins
 		}
 
 
-		public class Disconnected : IncursionStateManager.StateBase<Disconnected>,
+
+        public class Disconnected : IncursionStateManager.StateBase<Disconnected>,
             IncursionStateManager.IStateMachine
 		{
 
@@ -613,8 +649,12 @@ eventPlayer.player;
 				EventPlayer eventPlayer = ((PlayerStateManager)psm).
                 eventPlayer;
 
-				IncursionUI.ShowTeamUiForPlayer (player,
-					eventPlayer.psm.eg.ConvertTeamsToDict ());
+			    foreach (BasePlayer basePlayer in BasePlayer.activePlayerList)
+			    {
+
+                    IncursionUI.ShowTeamUiForPlayer(basePlayer,
+                        eventPlayer.psm.eg.ConvertTeamsToDict());
+                }
 			}
 
 			public new void Exit (IncursionStateManager.StateManager psm)
@@ -831,6 +871,8 @@ eventPlayer.player;
 				Colour = colour;
 				Location = teamLocation;
 			}
+
+		    public List<string> disconnectedPlayers = new List<string>();
 
 			public string TeamName { get; set; }
 

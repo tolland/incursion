@@ -135,7 +135,7 @@ namespace Oxide.Plugins
         {
             ConVar.Server.Log("oxide/logs/Loadlog.txt", message);
             ConVar.Server.Log("oxide/logs/ESMlog.txt", message);
-            iemUtils.Puts(message);
+            //iemUtils.Puts(message);
         }
 
         private static string prefix;
@@ -245,6 +245,19 @@ namespace Oxide.Plugins
             return null;
         }
 
+        #endregion
+
+        #region formatting
+
+
+        static double RoundToSignificantDigits(double d, int digits)
+        {
+            if (d == 0)
+                return 0;
+
+            double scale = Math.Pow(10, Math.Floor(Math.Log10(Math.Abs(d))) + 1);
+            return scale * Math.Round(d / scale, digits);
+        }
 
 
         #endregion
@@ -263,8 +276,9 @@ namespace Oxide.Plugins
             RaycastHit hitinfo;
             if (Physics.Raycast(position, Vector3Down, out hitinfo, 100f, groundLayer))
             {
-                DLog("returning in groundy: "+ hitinfo.point + Vector3.up + Vector3.up);
-                return hitinfo.point + Vector3.up + Vector3.up;
+                var buf = hitinfo.point + Vector3.up + Vector3.up;
+                DLog("returning in groundy: " + buf);
+                return buf;
             }
 
             IemUtils.DLog("couldn't find ground point");
