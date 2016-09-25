@@ -43,23 +43,29 @@ namespace Oxide.Plugins
             public void Update()
             {
                 incursionStateManager.Puts(this.ToString());
-                IemUtils.SLog("StateManager:Executing:" + currentState);
+                IemUtils.SLog(this.GetType().Name + ":Executing:" + currentState);
                 currentState.Execute(this);
+                IemUtils.SLog(this.GetType().Name + ":Executed:" + currentState);
             }
 
             public virtual void ChangeState(IStateMachine newState)
             {
                 //@todo probably want to throw exception instead
                 if ((currentState == null) || (newState == null))
-                    return;
-                IemUtils.SLog("stateManager:"+ this.GetType().Name);
-                IemUtils.SLog("StateManager:ChangeState:oldstate:" + currentState);
-                IemUtils.SLog("StateManager:ChangeState:newstate:" + newState);
+                {
+                    throw new Exception("can't change from invalid state");
+                }
+                    
+                //IemUtils.SLog("stateManager:"+ this.GetType().Name);
+                IemUtils.SLog(this.GetType().Name+":ChangeState:oldstate:" + 
+                    currentState.ToString().Replace("Oxide.Plugins.",""));
 
                 currentState.Exit(this);
                 previousState = currentState;
                 currentState = newState;
                 currentState.Enter(this);
+                IemUtils.SLog(this.GetType().Name + ":ChangeState:newstate:" +
+                    newState.ToString().Replace("Oxide.Plugins.", ""));
             }
 
             /// <summary>
@@ -70,19 +76,18 @@ namespace Oxide.Plugins
             {
                 if ((previousState == null) || (newState == null))
                     return;
-                IemUtils.SLog("stateManager:" + this.GetType().Name);
-                IemUtils.SLog("StateManager:ChangeState:PrevState:" + currentState);
-                IemUtils.SLog("StateManager:ChangeState:newstate:" + newState);
+                IemUtils.SLog(this.GetType().Name + ":ChangeState:PrevState:" + currentState);
                 previousState = currentState;
                 currentState = newState;
                 currentState.Enter(this);
+                IemUtils.SLog(this.GetType().Name + ":ChangeState:newstate:" + newState);
             }
 
             public virtual void SubStateReturn()
             {
-                IemUtils.SLog("stateManager:" + this.GetType().Name);
-                IemUtils.SLog("StateManager:ChangeState:PrevState:" + currentState);
-                IemUtils.SLog("StateManager:ChangeState:Reverting:" + previousState);
+               // IemUtils.SLog("stateManager:" + this.GetType().Name);
+                IemUtils.SLog(this.GetType().Name + ":ChangeState:PrevState:" + currentState);
+                IemUtils.SLog(this.GetType().Name + ":ChangeState:Reverting:" + previousState);
                 currentState.Exit(this);
                 currentState = previousState;
             }

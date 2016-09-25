@@ -6,6 +6,7 @@ using Oxide.Core.Plugins;
 using UnityEngine;
 using Random = System.Random;
 using System.Collections.Generic;
+using System.IO;
 
 namespace Oxide.Plugins
 {
@@ -110,10 +111,12 @@ namespace Oxide.Plugins
             iemUtils.Puts(message);
         }
 
-        public static void SLog(string message)
+        public static void SLog(string strMessage)
         {
-            ConVar.Server.Log("oxide/logs/Statelog.txt", message);
-            //iemUtils.Puts(message);
+            ConVar.Server.Log("oxide/logs/Statelog.txt", strMessage);
+            //string strFilename = "oxide/logs/Statelog.txt";
+            ////iemUtils.Puts(message);
+            //File.AppendAllText(string.Format("{0}/{1}", (object)ConVar.Server.rootFolder, (object)strFilename), string.Format("[{0}] {1}\r\n", (object)DateTime.Now.ToString(), (object)strMessage));
         }
 
         public static void DDLog(string message)

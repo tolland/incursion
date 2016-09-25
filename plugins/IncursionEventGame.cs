@@ -743,7 +743,7 @@ eventPlayer.player;
 
 
 
-			//@todo move this to the game definition
+			//todo: move this to the game definition
 			Vector3 loc = new Vector3 (-236, 3, 18);
 			float radius = 9f;
 			loc = IemUtils.GetRandomPointOnCircle (loc, radius);

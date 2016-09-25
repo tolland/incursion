@@ -181,7 +181,7 @@ namespace Oxide.Plugins
 				}
 
 			}
-		} 
+		}
          
 		/// <summary>
 		/// so a Game event is loaded and teams and players are available
@@ -432,9 +432,11 @@ namespace Oxide.Plugins
 				TeamGameStateManager gsm = (TeamGameStateManager)sm;
 
 				iemGameTeams.Subscribe (nameof (OnRunPlayerMetabolism));
+
+                //cancel game for each player
+                //TODO should it have a player cancelled state?
 				foreach (IncursionEventGame.EventPlayer eventPlayer in gsm.eg.gamePlayers.Values) {
 					eventPlayer.psm.ChangeState (IncursionEventGame.PlayerInPostGame.Instance);
-
 				}
 
 				IncursionUI.CreateGameBanner ("Game cancelled");

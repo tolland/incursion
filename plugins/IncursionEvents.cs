@@ -47,6 +47,11 @@ namespace Oxide.Plugins
         public EventStateManager esm;
         static IncursionEvents incursionEvents = null;
 
+        #endregion
+
+        #region Boilerplate
+        
+
         void Init()
         {
             incursionEvents = this;
@@ -54,10 +59,6 @@ namespace Oxide.Plugins
         }
 
         StoredData storedData;
-
-        #endregion
-
-        #region Boilerplate
 
         void Loaded()
         {
@@ -93,6 +94,10 @@ namespace Oxide.Plugins
             SaveConfig();
         }
 
+        #endregion
+
+        #region stuff that needs to  be fixed
+        
         ///This section is private methods for ESM
         /// 
         void MovePlayersToEsmLobby()
@@ -101,7 +106,7 @@ namespace Oxide.Plugins
 
             foreach (BasePlayer player in BasePlayer.activePlayerList)
             {
-                //@todo move this to the game definition
+                //TODO move this to the game definition
                 Vector3 loc = new Vector3(-236, 3, 18);
                 float radius = 8.5f;
                 loc = IemUtils.GetRandomPointOnCircle(loc, radius);
@@ -138,10 +143,32 @@ namespace Oxide.Plugins
             //IemUtils.DLog("Destroy ESM lobby");
         }
 
+        void ProcessScheduledEventToEventGame()
+        {
+            //process the list of teams and players who are preregistered for this
+            //scheduled event into the concrete game event
+            foreach (IemUtils.ScheduledEvent.ScheduledEventTeam seteam in esm.currentGameStateManager.nextEvent.schTeams.Values)
+            {
+                Plugins.IemUtils.DLog("team is " + seteam.TeamName);
+                foreach (IemUtils.ScheduledEvent.ScheduledEventPlayer scheduledEventPlayer in seteam.schPlayers.Values)
+                {
+                    //IemUtils.DLog("sched player is " + scheduledEventPlayer.steamId);
+                    ulong id;
+                    ulong.TryParse(scheduledEventPlayer.steamId, out id);
+                    BasePlayer idplayer = IemUtils.FindPlayerByID(id);
+                    if (idplayer != null)
+                    {
+                        IemUtils.DLog("base player is " + idplayer.displayName);
+                    }
+
+                }
+            }
+        }
+
+
         #endregion
 
-
-
+        #region event state manager
 
 
         public class EventStateManager : IncursionStateManager.StateManager
@@ -193,6 +220,10 @@ namespace Oxide.Plugins
                 {
                     ChangeState(EventManagementLobby.Instance);
                 }
+                else
+                {
+                    
+                }
 
 
                 if (IsAny(GameLoaded.Instance))
@@ -214,6 +245,8 @@ namespace Oxide.Plugins
 
             }
         }
+
+        #endregion
 
         #region event manager states
 
@@ -647,29 +680,6 @@ namespace Oxide.Plugins
 
         #endregion
 
-        void ProcessScheduledEventToEventGame()
-        {
-            //process the list of teams and players who are preregistered for this
-            //scheduled event into the concrete game event
-            foreach (IemUtils.ScheduledEvent.ScheduledEventTeam seteam in esm.currentGameStateManager.nextEvent.schTeams.Values)
-            {
-                Plugins.IemUtils.DLog("team is " + seteam.TeamName);
-                foreach (IemUtils.ScheduledEvent.ScheduledEventPlayer scheduledEventPlayer in seteam.schPlayers.Values)
-                {
-                    //IemUtils.DLog("sched player is " + scheduledEventPlayer.steamId);
-                    ulong id;
-                    ulong.TryParse(scheduledEventPlayer.steamId, out id);
-                    BasePlayer idplayer = IemUtils.FindPlayerByID(id);
-                    if (idplayer != null)
-                    {
-                        IemUtils.DLog("base player is " + idplayer.displayName);
-                    }
-
-                }
-            }
-        }
-
-
         #region data
 
         class StoredEventPlayer
@@ -700,16 +710,6 @@ namespace Oxide.Plugins
 
         #endregion
 
-        void OnRunPlayerMetabolism(PlayerMetabolism m, BaseCombatEntity entity)
-        {
-            var player = entity.ToPlayer();
-            if (player == null)
-                return;
-            IemUtils.SetMetabolismValues(player);
-        }
-
-
-
         #region chat control
 
         [ChatCommand("Test")]
@@ -731,8 +731,17 @@ namespace Oxide.Plugins
 
         #endregion
 
-
         #region player hooks and calls
+
+        void OnRunPlayerMetabolism(PlayerMetabolism m, BaseCombatEntity entity)
+        {
+            var player = entity.ToPlayer();
+            if (player == null)
+                return;
+            IemUtils.SetMetabolismValues(player);
+        }
+
+
 
         public void ShowTeamSelectHud(BasePlayer player)
         {
@@ -1025,7 +1034,6 @@ namespace Oxide.Plugins
 
         #endregion
 
-
         #region console control
 
         [ConsoleCommand("event")]
@@ -1093,6 +1101,4 @@ namespace Oxide.Plugins
         #endregion
 
     }
-
-
 }
