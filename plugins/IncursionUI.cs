@@ -14,12 +14,18 @@ namespace Oxide.Plugins
     public class IncursionUI : RustPlugin
     {
 
+
+
         [PluginReference]
         IemUtils IemUtils;
 
         static IncursionUI incursionUI = null;
 
         private static bool Debug = false;
+
+        private static List<string> guiList = new List<string>();
+
+        #region Boiler plate
 
         void Init()
         {
@@ -45,7 +51,9 @@ namespace Oxide.Plugins
             IemUtils.LogL("IncursionUI: on server initialized");
         }
 
+        #endregion
 
+        #region clean up
 
         public static void RemoveUIs()
         {
@@ -59,30 +67,19 @@ namespace Oxide.Plugins
 
         public static void CleanUpGui(BasePlayer player)
         {
-            CuiHelper.DestroyUi(player, "GameBanner");
-            CuiHelper.DestroyUi(player, "adminbannerMessage");
-            CuiHelper.DestroyUi(player, "adminbannerMessage2");
-            CuiHelper.DestroyUi(player, "adminbannerMessage3");
-            CuiHelper.DestroyUi(player, "scheduleradminbannerMessage");
-            CuiHelper.DestroyUi(player, "jailTimer");
-            CuiHelper.DestroyUi(player, "bannerMessage");
-            CuiHelper.DestroyUi(player, "eventmessage");
-            CuiHelper.DestroyUi(player, "team_overlay");
-            CuiHelper.DestroyUi(player, "game_results_overlay");
-            CuiHelper.DestroyUi(player, "TimerGui");
-            CuiHelper.DestroyUi(player, "DisplayEnterLobbyUIHeader");
-            CuiHelper.DestroyUi(player, "CreateEventBanner");
-            CuiHelper.DestroyUi(player, "CreatGameBanner");
-            CuiHelper.DestroyUi(player, "CreateBanner");
-
-
-
-
+            foreach (string gui in guiList)
+            {
+                CuiHelper.DestroyUi(player, gui);
+            }
         }
+
+        #endregion
 
         public static void ShowCountDownTimerGui(BasePlayer player, string time)
         {
-            CuiHelper.DestroyUi(player, "TimerGui");
+            string gui = "TimerGui";
+            guiList.Add(gui);
+            CuiHelper.DestroyUi(player, gui);
             var elements = new CuiElementContainer();
 
             var mainName = elements.Add(new CuiPanel
@@ -95,7 +92,7 @@ namespace Oxide.Plugins
                     AnchorMax = "0.1 1"
                 },
                 CursorEnabled = true
-            }, "Hud", "TimerGui");
+            }, "Hud", gui);
 
             elements.Add(new CuiLabel
             {
@@ -114,7 +111,9 @@ namespace Oxide.Plugins
 
         public static void ShowGameBanner(BasePlayer player, List<string> message)
         {
-            CuiHelper.DestroyUi(player, "GameBanner");
+            string gui = "GameBanner";
+            guiList.Add(gui);
+            CuiHelper.DestroyUi(player, gui);
             var elements = new CuiElementContainer();
             var mainName = elements.Add(new CuiPanel
             {
@@ -126,7 +125,7 @@ namespace Oxide.Plugins
                     AnchorMax = "1 1"
                 },
                 CursorEnabled = true
-            }, "Overlay", "GameBanner");
+            }, "Overlay", gui);
 
             elements.Add(new CuiLabel
             {
@@ -172,19 +171,20 @@ namespace Oxide.Plugins
         public static void CreateBanner(string message)
         {
             string ARENA = $"{message}";
-
+            string gui = "bannerMessage";
+            guiList.Add(gui);
             List<BasePlayer> activePlayers = BasePlayer.activePlayerList;
 
             foreach (BasePlayer player in activePlayers)
             {
-                CuiHelper.DestroyUi(player, "bannerMessage");
+                CuiHelper.DestroyUi(player, gui);
                 var container = UI.CreateElementContainer(
                                     "bannerMessage",
                                     "0.3 0.3 0.3 0.6",
                                     "0.22 0.945",
                                     "0.78 0.995",
                                     false);
-                UI.CreateLabel(ref container, "bannerMessage", "",
+                UI.CreateLabel(ref container, gui, "",
                     $"{ARENA}", 18, "0 0", "1 1");
                 CuiHelper.AddUi(player, container);
             }
@@ -193,7 +193,8 @@ namespace Oxide.Plugins
         public static void CreateGameBanner(string message)
         {
             string ARENA = $"{message}";
-
+            string gui = "CreateGameBanner";
+            guiList.Add(gui);
             List<BasePlayer> activePlayers = BasePlayer.activePlayerList;
 
             foreach (BasePlayer player in activePlayers)
@@ -214,7 +215,8 @@ namespace Oxide.Plugins
         public static void CreateEventBanner(string message)
         {
             string ARENA = $"{message}";
-
+            string gui = "CreateEventBanner";
+            guiList.Add(gui);
             List<BasePlayer> activePlayers = BasePlayer.activePlayerList;
 
             foreach (BasePlayer player in activePlayers)
@@ -236,7 +238,8 @@ namespace Oxide.Plugins
         public static void CreateEventStateManagerDebugBanner(string message)
         {
             string ARENA = $"{message}";
-
+            string gui = "adminbannerMessage";
+            guiList.Add(gui);
             List<BasePlayer> activePlayers = BasePlayer.activePlayerList;
 
             foreach (BasePlayer player in activePlayers)
@@ -258,6 +261,12 @@ namespace Oxide.Plugins
         {
             string ARENA = $"{message}";
 
+            string gui = "adminbannerMessage2";
+            guiList.Add(gui);
+            
+            if (player == null)
+                IemUtils.SLog("player is null");
+
             CuiHelper.DestroyUi(player, "adminbannerMessage2");
             var container = UI.CreateElementContainer(
                                 "adminbannerMessage2",
@@ -275,6 +284,8 @@ namespace Oxide.Plugins
         {
             string ARENA = $"{message}";
 
+            string gui = "adminbannerMessage3";
+            guiList.Add(gui);
             List<BasePlayer> activePlayers = BasePlayer.activePlayerList;
 
             foreach (BasePlayer player in activePlayers)
@@ -295,16 +306,18 @@ namespace Oxide.Plugins
         {
             string ARENA = $"{message}";
 
+            string gui = "scheduleradminbannerMessage";
+            guiList.Add(gui);
             List<BasePlayer> activePlayers = BasePlayer.activePlayerList;
 
             foreach (BasePlayer player in activePlayers)
             {
                 CuiHelper.DestroyUi(player, "scheduleradminbannerMessage");
                 var container = UI.CreateElementContainer(
-                                    "adminbannerMessage",
+                                    "scheduleradminbannerMessage",
                                     "0.3 0.3 0.3 0.6",
-                                    "0.22 0.870",
-                                    "0.78 0.845",
+                                    "0.22 0.845",
+                                    "0.78 0.87",
                                     false);
                 UI.CreateLabel(ref container, "scheduleradminbannerMessage", "",
                     $"{ARENA}", 14, "0 0", "1 1");
@@ -316,6 +329,8 @@ namespace Oxide.Plugins
         {
             string ARENA = $"msg: {message}";
 
+            string gui = "eventmessage";
+            guiList.Add(gui);
             List<BasePlayer> activePlayers = BasePlayer.activePlayerList;
 
             foreach (BasePlayer player in activePlayers)
@@ -344,7 +359,7 @@ namespace Oxide.Plugins
             foreach (BasePlayer player in BasePlayer.activePlayerList)
             {
 
-                IemUtils.DLog("removing " + "team_overlay");
+                //IemUtils.DLog("removing " + "team_overlay");
                 CuiHelper.DestroyUi(player, "team_overlay");
 
             }
@@ -353,7 +368,7 @@ namespace Oxide.Plugins
         public static void RemoveTeamUIForPlayer(BasePlayer player)
         {
 
-            IemUtils.DLog("removing " + "team_overlay");
+           // IemUtils.DLog("removing " + "team_overlay");
             CuiHelper.DestroyUi(player, "team_overlay");
 
 
@@ -381,7 +396,8 @@ namespace Oxide.Plugins
 
 
             int teamSlot = 0;
-
+            string gui = "game_results_overlay";
+            guiList.Add(gui);
             CuiHelper.DestroyUi(player, "game_results_overlay");
 
             var container = UI.CreateElementContainer(
@@ -508,6 +524,8 @@ namespace Oxide.Plugins
 
             int teamSlot = 0;
 
+            string gui = "team_overlay";
+            guiList.Add(gui);
             CuiHelper.DestroyUi(player, "team_overlay");
 
             var container = Hud.CreateElementContainer(
@@ -744,10 +762,27 @@ namespace Oxide.Plugins
                 {
                     string msg = "<color>some stuff here</color>";
 
-                    UseDisplayEnterLobbyUI(player, msg.ToString());
+                    IntroGUI(player, msg.ToString());
                 }
             }
         }
+
+
+
+        public static void DisplayTeamSelectUi(BasePlayer player, IemUtils.ScheduledEvent sevent)
+        {
+
+
+            CuiHelper.DestroyUi(player, "DisplayTeamSelectUi");
+            CuiHelper.DestroyUi(player, "DisplayEnterLobbyUIHeader");
+            CuiHelper.DestroyUi(player, "DisplayEnterLobbyUIOpenLobby");
+            CuiHelper.DestroyUi(player, "DisplayEnterLobbyUIScheduled");
+
+            DisplayEnterLobbyUIHeader(player);
+            DisplayEnterLobbyUIOpenLobby(player);
+            DisplayEnterLobbyUIScheduled(player, sevent);
+        }
+
 
         public static void DisplayEnterLobbyUIHeader(BasePlayer player)
         {
@@ -776,6 +811,26 @@ namespace Oxide.Plugins
                     AnchorMax = "1 0.9"
                 }
             }, mainName);
+
+            elements.Add(new CuiButton
+            {
+                Button = {
+                        //Close = "DisplayEnterLobbyUIHeader",
+                        Command = "global.ui removehud",
+                        Color = "255 0 0 1"
+                    },
+                RectTransform = {
+                        AnchorMin = "0.95 0.80",
+                        AnchorMax = "1.0 1.0"
+                    },
+                Text = {
+                        Text = "X",
+                        FontSize = 22,
+                        Align = TextAnchor.MiddleCenter
+                    }
+            }, mainName);
+
+
             CuiHelper.AddUi(player, elements);
         }
 
@@ -896,44 +951,85 @@ namespace Oxide.Plugins
                 CursorEnabled = true
             }, "Overlay", "DisplayEnterLobbyUIScheduled");
 
-            elements.Add(new CuiLabel
+
+            if (sevent == null)
             {
-                Text = {
+                elements.Add(new CuiLabel
+                {
+                    Text =
+                    {
+                        Text = "There is no scheduled event",
+                        FontSize = 22,
+                        Align = TextAnchor.MiddleCenter
+                    },
+                    RectTransform =
+                    {
+                        AnchorMin = "0 0.80",
+                        AnchorMax = "1 1.0"
+                    }
+                }, mainName);
+
+            }
+            else
+            {
+
+                elements.Add(new CuiLabel
+                {
+                    Text = {
                     Text = "Next Scheduled event!",
                     FontSize = 22,
                     Align = TextAnchor.MiddleCenter
                 },
-                RectTransform = {
+                    RectTransform = {
                     AnchorMin = "0 0.80",
                     AnchorMax = "1 1.0"
                 }
-            }, mainName);
+                }, mainName);
 
-            foreach (var team in sevent.schTeams.Values)
-            {
-                Plugins.IemUtils.DLog("team is " + team.TeamName);
-                elements.Add(new CuiButton
+                string[,] teamSlots =            {
+                { "0.25 0.50", "0.5 0.75" },
+                { "0.5 0.50", "0.75 0.75" },
+                { "0.25 0.25", "0.5 0.5" },
+                { "0.5 0.25", "0.75 0.5" }
+            };
+
+                int count = 0;
+
+
+                foreach (var team in sevent.schTeams.Values)
                 {
-                    Button = {
+                    Plugins.IemUtils.DLog("team is " + team.TeamName);
+                    elements.Add(new CuiButton
+                    {
+                        Button = {
                         Command = team.JoinCommand,
-                        Color = "0 255 0 1"
+                        Color = GetColor(team.Color)
                     },
-                    RectTransform = {
-                        AnchorMin = team.AnchorMin,
-                        AnchorMax = team.AnchorMax
+                        RectTransform = {
+                        AnchorMin = teamSlots[count,0],
+                        AnchorMax = teamSlots[count,1]
                     },
-                    Text = {
+                        Text = {
                         Text = team.TeamName,
                         FontSize = 22,
                         Align = TextAnchor.MiddleCenter
                     }
-                }, mainName);
+                    }, mainName);
+
+                    count++;
+                }
             }
+
+
+
+
+
+
 
             CuiHelper.AddUi(player, elements);
         }
 
-        public static void UseDisplayEnterLobbyUI(BasePlayer player, string msg)
+        public static void IntroGUI(BasePlayer player, string msg)
         {
             var elements = new CuiElementContainer();
 
@@ -947,7 +1043,7 @@ namespace Oxide.Plugins
                     AnchorMax = "1 1"
                 },
                 CursorEnabled = true
-            }, "Overlay", "EventSelectGUI");
+            }, "Overlay", "IntroGUI");
             var Agree = new CuiButton
             {
                 Button = {
@@ -960,57 +1056,6 @@ namespace Oxide.Plugins
                 },
                 Text = {
                     Text = "I Agree",
-                    FontSize = 22,
-                    Align = TextAnchor.MiddleCenter
-                }
-            };
-            var BlueTeam = new CuiButton
-            {
-                Button = {
-                    Command = "global.event joinblueteam",
-                    Close = mainName,
-                    Color = "0 0 255 1"
-                },
-                RectTransform = {
-                    AnchorMin = "0.5 0.26",
-                    AnchorMax = "0.75 0.3"
-                },
-                Text = {
-                    Text = "Blue Team",
-                    FontSize = 22,
-                    Align = TextAnchor.MiddleCenter
-                }
-            };
-            var RedTeam = new CuiButton
-            {
-                Button = {
-                    Command = "global.event joinredteam",
-                    Close = mainName,
-                    Color = "255 0 0 1"
-                },
-                RectTransform = {
-                    AnchorMin = "0.5 0.3",
-                    AnchorMax = "0.75 0.34"
-                },
-                Text = {
-                    Text = "Red Team",
-                    FontSize = 22,
-                    Align = TextAnchor.MiddleCenter
-                }
-            };
-            var RandomTeam = new CuiButton
-            {
-                Button = {
-                    Command = "global.event joinrandomteam",
-                    Close = mainName,
-                    Color = "0.5 0.5 0.5 1"
-                },
-                RectTransform = {
-                    AnchorMin = "0.5 0.16",
-                    AnchorMax = "0.75 0.2"
-                },
-                Text = {
-                    Text = "Join Random Team",
                     FontSize = 22,
                     Align = TextAnchor.MiddleCenter
                 }
@@ -1028,9 +1073,6 @@ namespace Oxide.Plugins
                 }
             }, mainName);
             elements.Add(Agree, mainName);
-            elements.Add(RedTeam, mainName);
-            elements.Add(BlueTeam, mainName);
-            elements.Add(RandomTeam, mainName);
             CuiHelper.AddUi(player, elements);
         }
 
@@ -1092,6 +1134,10 @@ namespace Oxide.Plugins
                     return;
                 case "removehud":
                     SendReply(arg, "3");
+
+                    CuiHelper.DestroyUi(arg.Player(), "DisplayTeamSelectUi");
+                    CuiHelper.DestroyUi(arg.Player(), "DisplayEnterLobbyUIHeader");
+                    CuiHelper.DestroyUi(arg.Player(), "DisplayEnterLobbyUIOpenLobby");
                     CuiHelper.DestroyUi(arg.Player(), "DisplayEnterLobbyUIScheduled");
                     return;
 

@@ -52,7 +52,7 @@ namespace Oxide.Plugins
 
         void OnEnterZone(string ZoneID, BasePlayer player)
         {
-            Puts("player is " + player.displayName + " has entered zone " + ZoneID);
+            //Puts("player is " + player.displayName + " has entered zone " + ZoneID);
         }
 
         //void OnExitZone(string ZoneID, BasePlayer player)
@@ -214,10 +214,11 @@ namespace Oxide.Plugins
                     "radius", "34",
                     "autolights", "true",
                     "eject", "false",
-                    "enter_message", "lobby zone",
-                    "leave_message", "leaving lobby zone",
+                    "enter_message", "",
+                    "leave_message", "",
                     "killsleepers", "true",
-                    //"undestr", "true",
+                    "nosuicide", "false",
+                    //"undestr", "true",nosuicide
                     "nobuild", "true",
                     "nodecay", "true",
                     //"nocorpse", "true",
@@ -519,12 +520,12 @@ namespace Oxide.Plugins
                         SaveData();
                     }
                 }
-                IemUtils.DLog(teamLobbyDoors.Count.ToString());
-                foreach (KeyValuePair<Vector3, TeamLobbyDoor> pair in teamLobbyDoors)
-                {
-                    IemUtils.DLog("key is " + pair.Key);
-                    IemUtils.DLog("value is " + pair.Value);
-                }
+                //IemUtils.DLog(teamLobbyDoors.Count.ToString());
+                //foreach (KeyValuePair<Vector3, TeamLobbyDoor> pair in teamLobbyDoors)
+                //{
+                //    IemUtils.DLog("key is " + pair.Key);
+                //    IemUtils.DLog("value is " + pair.Value);
+                //}
 
                 //storedData.RemoteActivators.Remove(remoteActivators[remoteActivate]);
                 //remoteActivators[remoteActivate].listedDoors.Add(new RemoteDoor(goodPos));

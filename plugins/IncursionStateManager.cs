@@ -9,7 +9,7 @@ namespace Oxide.Plugins
     [Info("Incursion State Manager", "Tolland", "0.1.0")]
     public class IncursionStateManager : RustPlugin
     {
-        static IncursionStateManager incursionStateManager = null;
+        static IncursionStateManager incursionStateManager;
 
         private static bool Debug = false;
 
@@ -22,19 +22,23 @@ namespace Oxide.Plugins
 
         public class StateManager
         {
-            IStateMachine currentState = null;
-            IStateMachine previousState = null;
+            IStateMachine currentState;
+            IStateMachine previousState;
 
             public StateManager(IStateMachine initialState)
             {
-                if (initialState == null)
-                    return;
+                if ((initialState == null))
+                    throw new Exception("initialState cannot be null");
 
+                IemUtils.SLog(this.GetType().Name + ":CREATING");
                 //set the initial state
                 currentState = initialState;
+
+
                 //@todo not sure if this is correct. should we enter the initial state?
                 currentState.Enter(this);
-
+                IemUtils.SLog(this.GetType().Name + ":initialstate:" +
+                    currentState.ToString().Replace("Oxide.Plugins.", ""));
             }
 
 
@@ -42,7 +46,9 @@ namespace Oxide.Plugins
             //not sure if this is relevant to this system???
             public void Update()
             {
-                incursionStateManager.Puts(this.ToString());
+                if ((currentState == null))
+                    throw new Exception("currentState state is null");
+
                 IemUtils.SLog(this.GetType().Name + ":Executing:" + currentState);
                 currentState.Execute(this);
                 IemUtils.SLog(this.GetType().Name + ":Executed:" + currentState);
@@ -53,7 +59,7 @@ namespace Oxide.Plugins
                 //@todo probably want to throw exception instead
                 if ((currentState == null) || (newState == null))
                 {
-                    throw new Exception("can't change from invalid state");
+                    throw new Exception("can't change from or to invalid state");
                 }
                     
                 //IemUtils.SLog("stateManager:"+ this.GetType().Name);
@@ -74,8 +80,13 @@ namespace Oxide.Plugins
             /// <param name="newState"></param>
             public virtual void SubState(IStateMachine newState)
             {
-                if ((previousState == null) || (newState == null))
-                    return;
+                if ((currentState == null))
+                    throw new Exception("currentState state is null");
+                
+                if ((newState == null))
+                    throw new Exception("newState is null");
+                
+
                 IemUtils.SLog(this.GetType().Name + ":ChangeState:PrevState:" + currentState);
                 previousState = currentState;
                 currentState = newState;
@@ -85,7 +96,11 @@ namespace Oxide.Plugins
 
             public virtual void SubStateReturn()
             {
-               // IemUtils.SLog("stateManager:" + this.GetType().Name);
+                if ((previousState == null))
+                    throw new Exception("previousState is null");
+                if ((currentState == null))
+                    throw new Exception("currentState state is null");
+
                 IemUtils.SLog(this.GetType().Name + ":ChangeState:PrevState:" + currentState);
                 IemUtils.SLog(this.GetType().Name + ":ChangeState:Reverting:" + previousState);
                 currentState.Exit(this);
@@ -94,12 +109,18 @@ namespace Oxide.Plugins
 
             public IStateMachine GetState()
             {
+                if ((currentState == null))
+                    throw new Exception("currentState state is null");
+
                 return currentState;
             }
 
 			public bool IsAny (params IStateMachine[] states)
-			{
-				foreach (var state in states) {
+            {
+                if ((currentState == null))
+                    throw new Exception("currentState state is null");
+
+                foreach (var state in states) {
 					if (state.Equals (currentState)) {
 						return true;
 					}
@@ -130,17 +151,17 @@ namespace Oxide.Plugins
 
             public virtual void Enter(StateManager psm)
             {
-                DLog("Entering the " + typeof(T));
+              //  IemUtils.DLog("Entering the " + typeof(T));
             }
 
             public void Execute(StateManager psm)
             {
-                DLog("Executing the " + typeof(T));
+               // IemUtils.DLog("Executing the " + typeof(T));
             }
 
             public void Exit(StateManager psm)
             {
-                DLog("Exiting the " + typeof(T));
+               // IemUtils.DLog("Exiting the " + typeof(T));
             }
 
 
@@ -148,16 +169,6 @@ namespace Oxide.Plugins
 
         #endregion
 
-        static void DLog(string message)
-        {
-            ConVar.Server.Log("oxide/logs/ESMlog.txt", message);
-            incursionStateManager.Puts(message);
-        }
-
-        static void BroadcastChat(string message)
-        {
-            incursionStateManager.rust.BroadcastChat(message);
-        }
     }
 
 }

@@ -398,17 +398,19 @@ namespace Oxide.Plugins
 			public EventPlayer ()
 			{
 				IemUtils.DLog ("calling constructor in eventplayer monobehavior");
-				psm = new PlayerStateManager (this, PlayerUnknown.Instance);
-				IemUtils.DLog ("calling constructor2 in eventplayer monobehavior");
-				IemUtils.DLog ("psm is null " + psm.GetState ().ToString ());
-
-				if (psm == null)
-					IemUtils.DLog ("psm is null " + psm.ToString ());
+				
 
 
 			}
 
-			public string PlayerId { get; set; }
+            void Update()
+            {
+                if (Input.GetKeyDown(KeyCode.J))
+                    IemUtils.DLog("J key was pressed");
+
+            }
+
+            public string PlayerId { get; set; }
 
 			public int Score { get; set; }
 
@@ -416,9 +418,18 @@ namespace Oxide.Plugins
 			{
 				IemUtils.DLog ("calling awake in eventplayer monobehavior");
 				player = GetComponent<BasePlayer> ();
-				psm.eventPlayer = this;
 
-			}
+                psm = new PlayerStateManager(this, PlayerUnknown.Instance);
+                
+                if (psm == null)
+                    throw new Exception("psm is null " + psm.ToString());
+
+                psm.eventPlayer = this;
+
+                //player.SendConsoleCommand("bind J global.event hud");
+                incursionEventGame.rust.RunClientCommand(player, "bind j global.event hud");
+
+            }
 		}
 
 
@@ -433,7 +444,7 @@ namespace Oxide.Plugins
 
 			public GameStateManager (IncursionStateManager.IStateMachine initialState, string name) : base (initialState)
 			{
-				IemUtils.DLog ("creating a game state manager in IncursionEventGame");
+				//IemUtils.DLog ("creating a game state manager in IncursionEventGame");
 				Name = name;
 				IncursionUI.CreateGameStateManagerDebugBanner ("state:" + GetState ().ToString ());
 				//update the reference in this plugin to hold the gsm
@@ -444,7 +455,6 @@ namespace Oxide.Plugins
 			{
 				base.ChangeState (newState);
 				IncursionUI.CreateGameStateManagerDebugBanner ("state:" + GetState ().ToString ());
-				IemUtils.DLog ("test");
 			}
 
 			public virtual void ReinitializeGame ()
@@ -475,8 +485,6 @@ namespace Oxide.Plugins
 			public PlayerStateManager (EventPlayer newEventPlayer, IncursionStateManager.IStateMachine initialState) : base (initialState)
 			{
 				eventPlayer = newEventPlayer;
-				//IemUtils.DDLog ("creating the player state manager in PlayerStateManager");
-				//Plugins.IemUtils.DDLog ("state is " + GetState ().ToString ());
 				IncursionUI.CreatePlayerStateManagerDebugBanner (eventPlayer.player,
 					"player state:" + GetState ().ToString ());
 			}
@@ -486,10 +494,8 @@ namespace Oxide.Plugins
 			public override void ChangeState (IncursionStateManager.IStateMachine newState)
 			{
 				base.ChangeState (newState);
-				//IemUtils.DDLog ("calling changeState in PlayerStateManager");
 				IncursionUI.CreatePlayerStateManagerDebugBanner (eventPlayer.player,
 					"state:" + eventPlayer.psm.GetState ().ToString ());
-
 			}
 
 
@@ -503,20 +509,6 @@ namespace Oxide.Plugins
 
 		#region player states
 
-		/// <summary>
-		/// Unknown - if a player is allocated to an event before having connect, their details
-		/// are unknown. But we want to be able to hold a spot for a player before joining
-		/// Disconnected - player has connected, but is not eligible for the lobby, or its not created yet
-		/// player has been allocated to team/event, but has not yet connected
-		/// players who are eligible to play, and have been moved to the pregame lobby
-		/// allocated to team, ready to start if solo game
-		/// playing, dead, sleeping
-		/// used to track players who disconnect during play
-		/// not sure if this is useful
-		/// 
-		/// </summary>
-
-
 		public class PlayerUnknown : IncursionStateManager.StateBase<PlayerUnknown>,
             IncursionStateManager.IStateMachine
 		{
@@ -529,16 +521,6 @@ namespace Oxide.Plugins
 		{
 
 		}
-
-		//public class GetScheduledEventsUiObject()
-		//{
-
-		//}
-
-		//public class GetCurrentEventsUiObject()
-		//{
-
-		//}
 
 		void doHook ()
 		{
@@ -554,15 +536,15 @@ namespace Oxide.Plugins
 
 				BasePlayer player = ((PlayerStateManager)psm).
                 eventPlayer.player;
-				IncursionUI.DisplayEnterLobbyUIHeader (player);
-				IncursionUI.DisplayEnterLobbyUIOpenLobby (player);
-				IemUtils.DLog ("ret is ");
+
 				//massive hack to deal with how to get the scheduling infos
+                //TODO don't need this anymore
 				object returnval = Interface.Oxide.CallHook ("OnInjectSchedulingInfos", player.UserIDString);
 				IemUtils.DLog ("ret is " + returnval);
-				//IemUtils.DLog("ret is " + ret.ToString());
-				IncursionUI.DisplayEnterLobbyUIScheduled (player, (IemUtils
+
+				IncursionUI.DisplayTeamSelectUi(player, (IemUtils
                     .ScheduledEvent)returnval);
+
 			}
 
 			public new void Execute (IncursionStateManager.StateManager psm)
@@ -570,9 +552,7 @@ namespace Oxide.Plugins
 
 				BasePlayer player = ((PlayerStateManager)psm).
                 eventPlayer.player;
-				CuiHelper.DestroyUi (player, "DisplayEnterLobbyUIHeader");
-				CuiHelper.DestroyUi (player, "DisplayEnterLobbyUIOpenLobby");
-				CuiHelper.DestroyUi (player, "DisplayEnterLobbyUIScheduled");
+				CuiHelper.DestroyUi (player, "DisplayTeamSelectUi");
 
 			}
 
@@ -580,18 +560,18 @@ namespace Oxide.Plugins
 			{
 				BasePlayer player = ((PlayerStateManager)psm).
                 eventPlayer.player;
-				CuiHelper.DestroyUi (player, "DisplayEnterLobbyUIHeader");
-				CuiHelper.DestroyUi (player, "DisplayEnterLobbyUIOpenLobby");
-				CuiHelper.DestroyUi (player, "DisplayEnterLobbyUIScheduled");
-			}
+                CuiHelper.DestroyUi(player, "DisplayTeamSelectUi");
+                CuiHelper.DestroyUi(player, "DisplayEnterLobbyUIHeader");
+                CuiHelper.DestroyUi(player, "DisplayEnterLobbyUIOpenLobby");
+                CuiHelper.DestroyUi(player, "DisplayEnterLobbyUIScheduled");
+            }
 		}
 
-		public class PlayerInEventLobbyNoGame : IncursionStateManager.StateBase<PlayerInEventLobbyNoGame>,
+		public class PlayerWaitingInEventLobbyNoGame : IncursionStateManager.StateBase<PlayerWaitingInEventLobbyNoGame>,
             IncursionStateManager.IStateMachine
 		{
 			public new void Enter (IncursionStateManager.StateManager psm)
 			{
-				IemUtils.DLog ("player is in the event Lobby, no game");
 
 				BasePlayer player = ((PlayerStateManager)psm).
                 eventPlayer.player;
@@ -610,7 +590,6 @@ namespace Oxide.Plugins
 eventPlayer.player;
 				EventPlayer eventPlayer = ((PlayerStateManager)psm).
                 eventPlayer;
-				IemUtils.DLog ("player is entering the PlayerInEventLobby");
 
 
 				IncursionUI.ShowTeamUiForPlayer (player, eventPlayer.psm.eg.ConvertTeamsToDict ());
@@ -618,7 +597,6 @@ eventPlayer.player;
 
 			public new void Exit (IncursionStateManager.StateManager psm)
 			{
-				IemUtils.DLog ("player is leaving the PlayerInEventLobby");
 				EventPlayer eventPlayer = ((PlayerStateManager)psm).
                 eventPlayer;
 				IncursionUI.RemoveTeamUIForPlayer (eventPlayer.player);
@@ -634,9 +612,6 @@ eventPlayer.player;
 eventPlayer.player;
 				EventPlayer eventPlayer = ((PlayerStateManager)psm).
                 eventPlayer;
-				IemUtils.DLog ("player is entering the PlayerInEventLobbyNoTeam");
-
-
 
 				IncursionUI.ShowTeamUiForPlayer (player,
 					eventPlayer.psm.eg.ConvertTeamsToDict ());
@@ -644,7 +619,6 @@ eventPlayer.player;
 
 			public new void Exit (IncursionStateManager.StateManager psm)
 			{
-				IemUtils.DLog ("player is leaving the EventLobbyNoTeam");
 				EventPlayer eventPlayer = ((PlayerStateManager)psm).eventPlayer;
 				IncursionUI.RemoveTeamUIForPlayer (eventPlayer.player);
 			}
@@ -772,20 +746,33 @@ eventPlayer.player;
 		public abstract class PlayerStateBase<T> where T : IncursionStateManager.StateBase<T>,
             IncursionStateManager.IStateMachine, new()
 		{
-		}
+        }
 
-		public class PlayerInGameTeamedDead : IncursionStateManager.StateBase<PlayerInGameTeamedDead>,
+        public class PlayerDead : IncursionStateManager.StateBase<PlayerDead>,
             IncursionStateManager.IStateMachine
-		{
-			public new void Enter (IncursionStateManager.StateManager psm)
-			{
-				base.Enter (psm);
+        {
+            public new void Enter(IncursionStateManager.StateManager psm)
+            {
+                base.Enter(psm);
+                BasePlayer player = ((PlayerStateManager)psm).
+                eventPlayer.player;
+                Plugins.IncursionUI.CleanUpGui(player);
+
+            }
+        }
+
+        public class PlayerInGameTeamedDead : IncursionStateManager.StateBase<PlayerInGameTeamedDead>,
+            IncursionStateManager.IStateMachine
+        {
+            public new void Enter(IncursionStateManager.StateManager psm)
+            {
+                base.Enter(psm);
 
 
-			}
-		}
+            }
+        }
 
-		public class PlayerInGameSolo : IncursionStateManager.StateBase<PlayerInGameSolo>,
+        public class PlayerInGameSolo : IncursionStateManager.StateBase<PlayerInGameSolo>,
             IncursionStateManager.IStateMachine
 		{
 			public new void Enter (IncursionStateManager.StateManager psm)
@@ -820,6 +807,7 @@ eventPlayer.player;
 			Plugins.IemUtils.DLog (player.UserIDString);
 			EventPlayer eventPlayer
                = player.GetComponent<EventPlayer> ();
+
 			if (eventPlayer == null) {
 				IemUtils.DLog ("creating eventPlayer");
 

@@ -7,6 +7,7 @@ using UnityEngine;
 using Random = System.Random;
 using System.Collections.Generic;
 using System.IO;
+using Oxide.Core;
 
 namespace Oxide.Plugins
 {
@@ -26,8 +27,6 @@ namespace Oxide.Plugins
         void Init()
         {
             iemUtils = this;
-            LogL("");
-            LogL("");
             LogL("");
             LogL("Init in iemutils");
         }
@@ -109,6 +108,7 @@ namespace Oxide.Plugins
         {
             ConVar.Server.Log("oxide/logs/ESMlog.txt", message);
             iemUtils.Puts(message);
+            //Interface.Oxide.LogInfo("[{0}] {1}", (object)this.Title, (object)(args.Length <= 0 ? format : string.Format(format, args)));
         }
 
         public static void SLog(string strMessage)
@@ -255,34 +255,39 @@ namespace Oxide.Plugins
         public static Vector3 Vector3Down = new Vector3(0f, -1f, 0f);
         public static int groundLayer = LayerMask.GetMask("Construction", "Terrain", "World");
 
-        public static float? GetGroundY(Vector3 position)
+        public static Vector3 GetGroundY(Vector3 position)
         {
 
+            position = position + Vector3.up;
             position = position + Vector3.up;
             RaycastHit hitinfo;
             if (Physics.Raycast(position, Vector3Down, out hitinfo, 100f, groundLayer))
             {
-                return hitinfo.point.y;
+                DLog("returning in groundy: "+ hitinfo.point + Vector3.up + Vector3.up);
+                return hitinfo.point + Vector3.up + Vector3.up;
             }
-            return null;
+
+            IemUtils.DLog("couldn't find ground point");
+            return position;
         }
 
 
-        static void TeleportPlayerPosition(BasePlayer player, Vector3 destination)
-        {
-            //DLog("teleporting player from " + player.transform.position.ToString());
-            //DLog("teleporting player to   " + destination.ToString());
-            player.MovePosition(destination);
-            player.ClientRPCPlayer(null, player, "ForcePositionTo", destination);
-            player.SetPlayerFlag(BasePlayer.PlayerFlags.ReceivingSnapshot, true);
-            player.UpdateNetworkGroup();
-            player.SendNetworkUpdateImmediate(false);
-            player.ClientRPCPlayer(null, player, "StartLoading", null, null, null, null, null);
-            player.SendFullSnapshot();
-        }
+        //static void TeleportPlayerPosition(BasePlayer player, Vector3 destination)
+        //{
+        //    //DLog("teleporting player from " + player.transform.position.ToString());
+        //    //DLog("teleporting player to   " + destination.ToString());
+        //    player.MovePosition(destination);
+        //    player.ClientRPCPlayer(null, player, "ForcePositionTo", destination);
+        //    player.SetPlayerFlag(BasePlayer.PlayerFlags.ReceivingSnapshot, true);
+        //    player.UpdateNetworkGroup();
+        //    player.SendNetworkUpdateImmediate(false);
+        //    player.ClientRPCPlayer(null, player, "StartLoading", null, null, null, null, null);
+        //    player.SendFullSnapshot();
+        //}
 
         public static void MovePlayerTo(BasePlayer player, Vector3 loc)
         {
+            DLog("moving player "+player.UserIDString);
             if (player.inventory.loot.IsLooting())
             {
                 player.EndLooting();
@@ -298,15 +303,10 @@ namespace Oxide.Plugins
         public static Vector3 GetRandomPointOnCircle(Vector3 centre, float radius)
         {
 
-            //get a random angli in radians
+            //get a random angle in radians
             float randomAngle = (float)random.NextDouble() * (float)Math.PI * 2.0f;
 
-            DLog("random angle is " + randomAngle.ToString());
-
             Vector3 loc = centre;
-
-            //iemUtils.Puts("x modifyier is " + ((float)Math.Cos(randomAngle) * radius));
-            //iemUtils.Puts("z modifyier is " + ((float)Math.Sin(randomAngle) * radius));
 
             loc.x = loc.x + ((float)Math.Cos(randomAngle) * radius);
             loc.z = loc.z + ((float)Math.Sin(randomAngle) * radius);
@@ -483,25 +483,26 @@ namespace Oxide.Plugins
                     guid = Guid.NewGuid();
                     schEvent.schTeams[newSchEventTeam.guid].schPlayers[guid] = this;
                     schEvent.schPlayers[guid] = this;
+                    schTeam = newSchEventTeam;
                 }
 
-                public ScheduledEventPlayer(string newSteamid, ScheduledEvent newSchEvent)
-                {
-                    steamId = newSteamid;
-                    DisplayName = newSteamid; //for something to display if this isn't set
-                    schEvent = newSchEvent;
-                    guid = Guid.NewGuid();
-                    schEvent.schPlayers[guid] = this;
-                }
+                //public ScheduledEventPlayer(string newSteamid, ScheduledEvent newSchEvent)
+                //{
+                //    steamId = newSteamid;
+                //    DisplayName = newSteamid; //for something to display if this isn't set
+                //    schEvent = newSchEvent;
+                //    guid = Guid.NewGuid();
+                //    schEvent.schPlayers[guid] = this;
+                //}
 
-                public ScheduledEventPlayer(string newSteamid, ScheduledEvent newSchEvent, Guid newGuid)
-                {
-                    steamId = newSteamid;
-                    DisplayName = newSteamid; //for something to display if this isn't set
-                    schEvent = newSchEvent;
-                    guid = newGuid;
-                    schEvent.schPlayers[guid] = this;
-                }
+                //public ScheduledEventPlayer(string newSteamid, ScheduledEvent newSchEvent, Guid newGuid)
+                //{
+                //    steamId = newSteamid;
+                //    DisplayName = newSteamid; //for something to display if this isn't set
+                //    schEvent = newSchEvent;
+                //    guid = newGuid;
+                //    schEvent.schPlayers[guid] = this;
+                //}
 
                 public ScheduledEventPlayer(string newSteamid, ScheduledEventTeam newSchEventTeam, Guid newGuid)
                 {
@@ -511,6 +512,7 @@ namespace Oxide.Plugins
                     guid = newGuid;
                     schEvent.schPlayers[guid] = this;
                     schEvent.schTeams[newSchEventTeam.guid].schPlayers[guid] = this;
+                    schTeam = newSchEventTeam;
                 }
             }
         }
