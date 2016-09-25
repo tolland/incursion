@@ -37,7 +37,7 @@ namespace Oxide.Plugins
          
 		public IncursionEvents.EventStateManager esm;
 
-		void Loaded ()
+		void Loaded () 
 		{
 			Unsubscribe (nameof (OnRunPlayerMetabolism));
 
@@ -56,7 +56,7 @@ namespace Oxide.Plugins
 				IemUtils.DLog ("esm is null");
 
 			//tell the event manager about this game
-			esm.RegisterGameStateManager (teamGameStateManager); 
+			esm.RegisterGameStateManager (teamGameStateManager);
 
 
 			//load the game to be managed by the state manager
@@ -64,7 +64,7 @@ namespace Oxide.Plugins
 			teamGameStateManager.ChangeState (GameEventLoaded.Instance);
 
 			//tell the Esm to check whether to update the lobby 
-			IemUtils.DDLog ("esm state is " + esm.GetState ());
+			//IemUtils.DDLog ("esm state is " + esm.GetState ());
 			esm.Update ();
 
 			IemUtils.LogL ("iemGameTeams: Loaded complete");
@@ -124,7 +124,7 @@ namespace Oxide.Plugins
 			public TeamGameStateManager (IncursionStateManager.IStateMachine initialState,
 			                             string Gamename) : base (initialState, Gamename)
 			{
-				IemUtils.DLog ("creating a game state manager - in TeamGameStateManager");
+				//IemUtils.DLog ("creating a game state manager - in TeamGameStateManager");
 				Name = Gamename;
             }
 
@@ -136,7 +136,7 @@ namespace Oxide.Plugins
 
             }
 
-            public override void CancelGame()
+            public override void CancelGame() 
             {
                 IemUtils.DLog("cancelled game in IemGameTeams");
                 ChangeState(GameCancelled.Instance);
@@ -154,7 +154,7 @@ namespace Oxide.Plugins
 		{
 			public new void Enter (IncursionStateManager.StateManager gsm)
 			{
-				IemUtils.DLog ("entry in GameStateCreated");
+				//IemUtils.DLog ("entry in GameStateCreated");
 			}
 		}
 
@@ -166,14 +166,14 @@ namespace Oxide.Plugins
 		{
 			public new void Enter (IncursionStateManager.StateManager gsm)
 			{
-				IemUtils.DLog ("entry in GameEventLoaded");
+				//IemUtils.DLog ("entry in GameEventLoaded");
 			}
 
 			public new void
                 Execute (IncursionStateManager.StateManager sm)
 			{
 				TeamGameStateManager gsm = (TeamGameStateManager)sm;
-				IemUtils.DLog ("execute in GameEventLoaded");
+				//IemUtils.DLog ("execute in GameEventLoaded");
 				if (gsm.eg.CanGameStart ()) {
 					gsm.ChangeState (GameEventCanStart.Instance);
 				} else {
@@ -481,7 +481,7 @@ namespace Oxide.Plugins
 
 
 			}
-		}
+		} 
 
 		[ConsoleCommand ("gamex")]
 		void ccmdEvent222 (ConsoleSystem.Arg arg)

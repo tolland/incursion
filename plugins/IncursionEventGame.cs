@@ -475,8 +475,8 @@ namespace Oxide.Plugins
 			public PlayerStateManager (EventPlayer newEventPlayer, IncursionStateManager.IStateMachine initialState) : base (initialState)
 			{
 				eventPlayer = newEventPlayer;
-				IemUtils.DDLog ("creating the player state manager in PlayerStateManager");
-				Plugins.IemUtils.DDLog ("state is " + GetState ().ToString ());
+				//IemUtils.DDLog ("creating the player state manager in PlayerStateManager");
+				//Plugins.IemUtils.DDLog ("state is " + GetState ().ToString ());
 				IncursionUI.CreatePlayerStateManagerDebugBanner (eventPlayer.player,
 					"player state:" + GetState ().ToString ());
 			}
@@ -486,7 +486,7 @@ namespace Oxide.Plugins
 			public override void ChangeState (IncursionStateManager.IStateMachine newState)
 			{
 				base.ChangeState (newState);
-				IemUtils.DDLog ("calling changeState in PlayerStateManager");
+				//IemUtils.DDLog ("calling changeState in PlayerStateManager");
 				IncursionUI.CreatePlayerStateManagerDebugBanner (eventPlayer.player,
 					"state:" + eventPlayer.psm.GetState ().ToString ());
 

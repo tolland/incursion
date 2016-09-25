@@ -43,6 +43,7 @@ namespace Oxide.Plugins
             public void Update()
             {
                 incursionStateManager.Puts(this.ToString());
+                IemUtils.SLog("StateManager:Executing:" + currentState);
                 currentState.Execute(this);
             }
 
