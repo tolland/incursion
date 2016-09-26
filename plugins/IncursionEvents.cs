@@ -174,6 +174,7 @@ namespace Oxide.Plugins
                 = new Dictionary<string, IncursionEventGame.GameStateManager>();
             public IncursionEventGame.GameStateManager currentGameStateManager;
             public IncursionStateManager.StateManager scheduler;
+            public string cachedEventBanner = "";
 
             public EventStateManager(IncursionStateManager.IStateMachine initialState) : base(initialState)
             {
@@ -187,6 +188,25 @@ namespace Oxide.Plugins
                 //IemUtils.DDLog("changing state in EventStateManager");
                 IncursionUI.CreateEventStateManagerDebugBanner("state:" + GetState().ToString());
 
+            }
+
+
+            public void CreateEventBanner(string message)
+            {
+                if (message.Equals(cachedEventBanner))
+                    return;
+                IemUtils.DLog("caching event banner");
+                cachedEventBanner = message;
+
+                foreach (BasePlayer player in BasePlayer.activePlayerList)
+                {
+                    IncursionUI.CreateEventBanner(player, message);
+                }
+            }
+
+            public void CreateEventBanner(BasePlayer player, string message)
+            {
+                IncursionUI.CreateEventBanner(player, message);
             }
 
             public void RegisterGameStateManager(IncursionEventGame.GameStateManager gameStateManager)
@@ -245,6 +265,16 @@ namespace Oxide.Plugins
                 }
 
                 if (IsAny(GameLoaded.Instance))
+                {
+                    //this will open the event lobby
+                    Update();
+                }
+                else
+                {
+                    //IemUtils.SLog("not game loaded here:" + GetState());
+                }
+
+                if (IsAny(EventLobbyOpen.Instance))
                 {
                     //this will open the event lobby
                     Update();
@@ -441,11 +471,13 @@ namespace Oxide.Plugins
 
         private void OnPlayerDisconnected(BasePlayer player)
         {
-            IemUtils.DLog("player disconnected in IncursionEvents");
             esm.currentGameStateManager.eg.RemovePlayerFromTeams(player);
             IncursionEventGame.EventPlayer eventPlayer
                      = IncursionEventGame.EventPlayer.GetEventPlayer(player);
-            eventPlayer.eventTeam.disconnectedPlayers.Add(eventPlayer.PlayerId);
+            if (eventPlayer.eventTeam!=null)
+                eventPlayer.eventTeam.disconnectedPlayers.Add(eventPlayer.PlayerId);
+            
+            
 
         }
         /// <summary>
@@ -762,11 +794,16 @@ namespace Oxide.Plugins
         {
             IncursionUI.CreateSchedulerStateManagerDebugBanner("state:" + esm.scheduler.GetState().ToString());
             IncursionUI.CreateEventStateManagerDebugBanner("state:" + esm.GetState().ToString());
+
+            IemUtils.DLog("adding GSM debug banner");
+            IncursionUI.CreateGameStateManagerDebugBanner("state:" + esm.currentGameStateManager.GetState().ToString());
+            IncursionUI.CreateGameBanner(eventPlayer.player, esm.currentGameStateManager.cachedGameBanner);
+
+            IncursionUI.CreateEventBanner(eventPlayer.player, esm.cachedEventBanner);
         }
 
         /// <summary>
-        /// this is called when the player respawns from dead, or after
-        /// waking from sleep after connecting
+        /// this is called when the player is waking from sleep after connecting
         /// </summary>
         /// <param name="player"></param>
         /// 
@@ -785,7 +822,6 @@ namespace Oxide.Plugins
 
             IemUtils.DLog("psm is " + eventPlayer.psm);
 
-            RestoreUI(eventPlayer);
             
             //@todo if this triggers its a bug, seems to happen after dead player reconnects
             if (eventPlayer.psm == null)
@@ -813,8 +849,6 @@ namespace Oxide.Plugins
             }
             else
             {
-                IemUtils.DLog("adding GSM debug banner");
-                IncursionUI.CreateGameStateManagerDebugBanner("state:" + esm.currentGameStateManager.GetState().ToString());
 
 
                 if (esm.currentGameStateManager.eg.gamePlayers.ContainsKey(player.UserIDString))
@@ -906,7 +940,7 @@ namespace Oxide.Plugins
 
             }
 
-
+            RestoreUI(eventPlayer);
 
         }
 

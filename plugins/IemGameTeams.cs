@@ -225,9 +225,10 @@ namespace Oxide.Plugins
             private Timer warningTimer = null;
             //private static readonly Object obj = new Object();
 
-            public new void Enter(IncursionStateManager.StateManager gsm)
+            public new void Enter(IncursionStateManager.StateManager sm)
             {
-                IncursionUI.CreateGameBanner("game can start");
+                TeamGameStateManager gsm = (TeamGameStateManager)sm;
+                gsm.CreateGameBanner("game can start");
             }
 
             public new void Execute(IncursionStateManager.StateManager sm)
@@ -246,7 +247,7 @@ namespace Oxide.Plugins
                     if (iemGameTeams.AutoStart)
                     {
 
-                        IncursionUI.CreateGameBanner("game can start");
+                        gsm.CreateGameBanner("game can start");
                         // IemUtils.SLog("setting up timer");
 
                         if (warningTimer == null)
@@ -280,10 +281,11 @@ namespace Oxide.Plugins
 
             public new void Exit(IncursionStateManager.StateManager sm)
             {
+                TeamGameStateManager gsm = (TeamGameStateManager)sm;
                 IemUtils.SLog("before cancel timer");
                 warningTimer.Destroy();
                 IemUtils.SLog("after cancel timer");
-                IncursionUI.CreateGameBanner("EXITING");
+                gsm.CreateGameBanner("EXITING");
             }
         }
 
@@ -293,9 +295,10 @@ namespace Oxide.Plugins
         public class GameEventCannotStart : IncursionStateManager.StateBase<GameEventCannotStart>,
             IncursionStateManager.IStateMachine
         {
-            public new void Enter(IncursionStateManager.StateManager gsm)
+            public new void Enter(IncursionStateManager.StateManager sm)
             {
-                IncursionUI.CreateGameBanner("Game cannot start");
+                TeamGameStateManager gsm = (TeamGameStateManager)sm;
+                gsm.CreateGameBanner(gsm.eg.GetGameStartCriteria());
             }
 
             public new void Execute(IncursionStateManager.StateManager sm)
@@ -305,6 +308,10 @@ namespace Oxide.Plugins
                 if (gsm.eg.CanGameStart())
                 {
                     gsm.ChangeState(GameEventCanStart.Instance);
+                }
+                else
+                {
+                    gsm.CreateGameBanner(gsm.eg.GetGameStartCriteria());
                 }
             }
         }
@@ -341,7 +348,7 @@ namespace Oxide.Plugins
                         gsm.eg.GameIntroBanner);
                 }
 
-                IncursionUI.CreateGameBanner("GAME LOBBY");
+                gsm.CreateGameBanner("GAME LOBBY");
                 warningTimer = iemGameTeams.timer.Once(gsm.eg.GameLobbyWait, () =>
                 {
                     gsm.ChangeState(GameStarted.Instance);
@@ -379,16 +386,16 @@ namespace Oxide.Plugins
             {
                 TeamGameStateManager gsm = (TeamGameStateManager)sm;
                 iemGameTeams.Subscribe(nameof(OnRunPlayerMetabolism));
-                IncursionUI.CreateGameBanner("GAME STARTED");
+                gsm.CreateGameBanner("GAME STARTED");
                 if (gsm.eg.TimedGame)
                 {
                     warningTimer = iemGameTeams.timer.Once(gsm.eg.TimeLimit - 10, () =>
                     {
-                        IncursionUI.CreateGameBanner("Game ending in 10 seconds - warning");
+                        gsm.CreateGameBanner("Game ending in 10 seconds - warning");
                     });
                     finalWarningTimer = iemGameTeams.timer.Once(gsm.eg.TimeLimit - 5, () =>
                     {
-                        IncursionUI.CreateGameBanner("Game ending in 5 seconds - final warning");
+                        gsm.CreateGameBanner("Game ending in 5 seconds - final warning");
                     });
                     gameTimer = iemGameTeams.timer.Once(gsm.eg.TimeLimit, () =>
                     {
@@ -413,13 +420,15 @@ namespace Oxide.Plugins
         {
             public new void Enter(IncursionStateManager.StateManager sm)
             {
+                TeamGameStateManager gsm = (TeamGameStateManager)sm;
                 iemGameTeams.Subscribe(nameof(OnRunPlayerMetabolism));
-                IncursionUI.CreateGameBanner("GAME PAUSED");
+                gsm.CreateGameBanner("GAME PAUSED");
             }
 
-            public new void Exit(IncursionStateManager.StateManager esm)
+            public new void Exit(IncursionStateManager.StateManager sm)
             {
-                IncursionUI.CreateGameBanner("");
+                TeamGameStateManager gsm = (TeamGameStateManager)sm;
+                gsm.CreateGameBanner("");
                 iemGameTeams.Unsubscribe(nameof(OnRunPlayerMetabolism));
             }
         }
@@ -443,7 +452,7 @@ namespace Oxide.Plugins
 
                 }
 
-                IncursionUI.CreateGameBanner("Game ended");
+                gsm.CreateGameBanner("Game ended");
 
                 ((IncursionEventGame.GameStateManager)gsm).eg.ShowGameResultUI();
 
@@ -457,11 +466,12 @@ namespace Oxide.Plugins
 
             }
 
-            public new void Exit(IncursionStateManager.StateManager esm)
+            public new void Exit(IncursionStateManager.StateManager sm)
             {
+                TeamGameStateManager gsm = (TeamGameStateManager)sm;
                 warningTimer.Destroy();
-                IncursionUI.CreateGameBanner("");
-                ((IncursionEventGame.GameStateManager)esm).eg.RemoveGameResultUI();
+                gsm.CreateGameBanner("");
+                gsm.eg.RemoveGameResultUI();
                 iemGameTeams.Unsubscribe(nameof(OnRunPlayerMetabolism));
             }
 
@@ -485,7 +495,7 @@ namespace Oxide.Plugins
                     eventPlayer.psm.ChangeState(IncursionEventGame.PlayerInPostGame.Instance);
                 }
 
-                IncursionUI.CreateGameBanner("Game cancelled");
+                gsm.CreateGameBanner("Game cancelled");
 
                 //@todo do we need to wait?
                 //warningTimer = iemGameTeams.timer.Once (3f, () => {

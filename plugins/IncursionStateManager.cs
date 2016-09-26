@@ -61,10 +61,10 @@ namespace Oxide.Plugins
                 {
                     throw new Exception("can't change from or to invalid state");
                 }
-                    
+
                 //IemUtils.SLog("stateManager:"+ this.GetType().Name);
-                IemUtils.SLog(this.GetType().Name+":ChangeState:oldstate:" + 
-                    currentState.ToString().Replace("Oxide.Plugins.",""));
+                IemUtils.SLog(this.GetType().Name + ":ChangeState:oldstate:" +
+                    currentState.ToString().Replace("Oxide.Plugins.", ""));
 
                 currentState.Exit(this);
                 previousState = currentState;
@@ -82,10 +82,10 @@ namespace Oxide.Plugins
             {
                 if ((currentState == null))
                     throw new Exception("currentState state is null");
-                
+
                 if ((newState == null))
                     throw new Exception("newState is null");
-                
+
 
                 IemUtils.SLog(this.GetType().Name + ":ChangeState:PrevState:" + currentState);
                 previousState = currentState;
@@ -115,19 +115,21 @@ namespace Oxide.Plugins
                 return currentState;
             }
 
-			public bool IsAny (params IStateMachine[] states)
+            public bool IsAny(params IStateMachine[] states)
             {
                 if ((currentState == null))
                     throw new Exception("currentState state is null");
 
-                foreach (var state in states) {
-					if (state.Equals (currentState)) {
-						return true;
-					}
-				}
+                foreach (var state in states)
+                {
+                    if (state.Equals(currentState))
+                    {
+                        return true;
+                    }
+                }
 
-				return false;
-			}
+                return false;
+            }
         }
 
         public interface IStateMachine
@@ -143,25 +145,28 @@ namespace Oxide.Plugins
 
             //add something for thread safety.... locks etc
             private static T _instance = new T();
+            private Type statemanagertype;
 
             public static T Instance
             {
                 get { return _instance; }
+
             }
 
+            //TODO how to force this to the correct runtime type
             public virtual void Enter(StateManager psm)
             {
-              //  IemUtils.DLog("Entering the " + typeof(T));
+                // IemUtils.DLog("Entering the " + typeof(T));
             }
 
             public void Execute(StateManager psm)
             {
-               // IemUtils.DLog("Executing the " + typeof(T));
+                // IemUtils.DLog("Executing the " + typeof(T));
             }
 
             public void Exit(StateManager psm)
             {
-               // IemUtils.DLog("Exiting the " + typeof(T));
+                // IemUtils.DLog("Exiting the " + typeof(T));
             }
 
 

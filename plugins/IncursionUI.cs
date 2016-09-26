@@ -190,48 +190,42 @@ namespace Oxide.Plugins
             }
         }
 
-        public static void CreateGameBanner(string message)
+        public static void CreateGameBanner(BasePlayer player, string message)
         {
             string ARENA = $"{message}";
             string gui = "CreateGameBanner";
             guiList.Add(gui);
-            List<BasePlayer> activePlayers = BasePlayer.activePlayerList;
 
-            foreach (BasePlayer player in activePlayers)
-            {
-                CuiHelper.DestroyUi(player, "CreateGameBanner");
-                var container = UI.CreateElementContainer(
-                                    "CreateGameBanner",
-                                    "0.3 0.3 0.3 0.6",
-                                    "0.22 0.945",
-                                    "0.78 0.995",
-                                    false);
-                UI.CreateLabel(ref container, "CreateGameBanner", "",
-                    $"{ARENA}", 16, "0 0", "1 0.5");
-                CuiHelper.AddUi(player, container);
-            }
+            CuiHelper.DestroyUi(player, "CreateGameBanner");
+            var container = UI.CreateElementContainer(
+                                "CreateGameBanner",
+                                "0.3 0.3 0.3 0.6",
+                                "0.22 0.945",
+                                "0.78 0.995",
+                                false);
+            UI.CreateLabel(ref container, "CreateGameBanner", "",
+                $"{ARENA}", 16, "0 0", "1 0.5");
+            CuiHelper.AddUi(player, container);
+
         }
 
-        public static void CreateEventBanner(string message)
+        public static void CreateEventBanner(BasePlayer player, string message)
         {
             string ARENA = $"{message}";
             string gui = "CreateEventBanner";
             guiList.Add(gui);
-            List<BasePlayer> activePlayers = BasePlayer.activePlayerList;
 
-            foreach (BasePlayer player in activePlayers)
-            {
-                CuiHelper.DestroyUi(player, "CreateEventBanner");
-                var container = UI.CreateElementContainer(
-                                    "CreateEventBanner",
-                                    "0.3 0.3 0.3 0.6",
-                                    "0.22 0.945",
-                                    "0.78 0.995",
-                                    false);
-                UI.CreateLabel(ref container, "CreateEventBanner", "",
-                    $"{ARENA}", 16, "0 0.5", "1 1");
-                CuiHelper.AddUi(player, container);
-            }
+            CuiHelper.DestroyUi(player, "CreateEventBanner");
+            var container = UI.CreateElementContainer(
+                                "CreateEventBanner",
+                                "0.3 0.3 0.3 0.6",
+                                "0.22 0.945",
+                                "0.78 0.995",
+                                false);
+            UI.CreateLabel(ref container, "CreateEventBanner", "",
+                $"{ARENA}", 16, "0 0.5", "1 1");
+            CuiHelper.AddUi(player, container);
+
         }
 
 
@@ -263,7 +257,7 @@ namespace Oxide.Plugins
 
             string gui = "adminbannerMessage2";
             guiList.Add(gui);
-            
+
             if (player == null)
                 IemUtils.SLog("player is null");
 
@@ -368,7 +362,7 @@ namespace Oxide.Plugins
         public static void RemoveTeamUIForPlayer(BasePlayer player)
         {
 
-           // IemUtils.DLog("removing " + "team_overlay");
+            // IemUtils.DLog("removing " + "team_overlay");
             CuiHelper.DestroyUi(player, "team_overlay");
 
 

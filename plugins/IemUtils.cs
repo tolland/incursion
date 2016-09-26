@@ -131,6 +131,12 @@ namespace Oxide.Plugins
             //iemUtils.Puts(message);
         }
 
+        public static void TimerLog(string message)
+        {
+            ConVar.Server.Log("oxide/logs/timerlog.txt", message);
+            //iemUtils.Puts(message);
+        }
+
         public static void LogL(string message)
         {
             ConVar.Server.Log("oxide/logs/Loadlog.txt", message);
