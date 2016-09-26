@@ -98,7 +98,7 @@ namespace Oxide.Plugins
             IemUtils.DLog("finding spawn point in game");
 
             IncursionEventGame.EventPlayer eventPlayer
-                = IncursionEventGame.GetEventPlayer(player);
+                = IncursionEventGame.EventPlayer.GetEventPlayer(player);
             Vector3 loc = eventPlayer.eventTeam.Location;
             Vector3 circpoint = IemUtils.GetRandomPointOnCircle(loc, 4f);
 
@@ -295,6 +295,7 @@ namespace Oxide.Plugins
         {
             public new void Enter(IncursionStateManager.StateManager gsm)
             {
+                IncursionUI.CreateGameBanner("Game cannot start");
             }
 
             public new void Execute(IncursionStateManager.StateManager sm)
@@ -354,7 +355,7 @@ namespace Oxide.Plugins
                 foreach (BasePlayer player in BasePlayer.activePlayerList)
                 {
                     IncursionEventGame.EventPlayer eventPlayer
-                        = IncursionEventGame.GetEventPlayer(player);
+                        = IncursionEventGame.EventPlayer.GetEventPlayer(player);
                     //eventPlayer.psm.eg = ((IncursionEvents.EventStateManager)esm).eg;
                     IncursionUI.HideGameBanner(player);
                 }

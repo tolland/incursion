@@ -278,7 +278,7 @@ namespace Oxide.Plugins
                 IemUtils.DLog("calling remove player from teams");
                 //If the BasePlayer is a new connection
                 EventPlayer eventPlayer
-                    = GetEventPlayer(player);
+                    = EventPlayer.GetEventPlayer(player);
                 return RemovePlayerFromTeams(eventPlayer);
             }
 
@@ -312,7 +312,7 @@ namespace Oxide.Plugins
 				IemUtils.DLog ("calling add player to team");
 				//If the BasePlayer is a new connection
 				EventPlayer eventPlayer
-                    = GetEventPlayer (player);
+                    = EventPlayer.GetEventPlayer (player);
 
 				if (!gamePlayers.ContainsKey (eventPlayer.PlayerId))
 					gamePlayers.Add (eventPlayer.PlayerId, eventPlayer);
@@ -420,9 +420,7 @@ namespace Oxide.Plugins
 
 		}
 
-
-
-		public class EventPlayer : MonoBehaviour
+        public class EventPlayer : MonoBehaviour
 		{
 			public BasePlayer player;
 			public IncursionEventGame.EventTeam eventTeam;
@@ -430,24 +428,36 @@ namespace Oxide.Plugins
 			//@todo should the Monobehaviour be applied to the Statemanager?
 			public PlayerStateManager psm;
 
-			public EventPlayer ()
+            public string PlayerId { get; set; }
+            public int Score { get; set; }
+
+            public EventPlayer ()
 			{
 				IemUtils.DLog ("calling constructor in eventplayer monobehavior");
-				
-
-
 			}
 
-            void Update()
+		    public static EventPlayer GetEventPlayer(BasePlayer player)
+		    {
+		        Plugins.IemUtils.DLog(player.UserIDString);
+		        EventPlayer eventPlayer
+		            = player.GetComponent<EventPlayer>();
+
+		        if (eventPlayer == null)
+		        {
+		            IemUtils.DLog("creating eventPlayer");
+
+		            eventPlayer = player.gameObject.AddComponent<EventPlayer>();
+		            eventPlayer.PlayerId = player.UserIDString;
+		            eventPlayer.player = player;
+		        }
+		        return eventPlayer;
+		    }
+
+		    void Update()
             {
                 if (Input.GetKeyDown(KeyCode.J))
                     IemUtils.DLog("J key was pressed");
-
             }
-
-            public string PlayerId { get; set; }
-
-			public int Score { get; set; }
 
 			void Awake ()
 			{
@@ -842,22 +852,6 @@ eventPlayer.player;
 
 
 
-		public static EventPlayer GetEventPlayer (BasePlayer player)
-		{
-			Plugins.IemUtils.DLog (player.UserIDString);
-			EventPlayer eventPlayer
-               = player.GetComponent<EventPlayer> ();
-
-			if (eventPlayer == null) {
-				IemUtils.DLog ("creating eventPlayer");
-
-				eventPlayer = player.gameObject.AddComponent<EventPlayer> ();
-				eventPlayer.PlayerId = player.UserIDString;
-				eventPlayer.player = player;
-			}
-			return eventPlayer;
-		}
-
 
 		public class EventTeam
 		{
@@ -909,7 +903,7 @@ eventPlayer.player;
 							target.SendNetworkUpdate ();
 							//timer.Once (time, () => target.SetFlag (BaseEntity.Flags.On, true));
 
-							EventPlayer eventPlayer = GetEventPlayer (attacker);
+							EventPlayer eventPlayer = EventPlayer.GetEventPlayer (attacker);
 
 							eventPlayer.Score += 1;
 
@@ -936,11 +930,10 @@ eventPlayer.player;
 			//	SendReply (arg, incursionEventGame.gameStateManager.GetState ().ToString ());
 				return;
 			case "player":
-				EventPlayer eventPlayer = GetEventPlayer (arg.Player ());
+				EventPlayer eventPlayer = EventPlayer.GetEventPlayer (arg.Player ());
 				SendReply (arg, eventPlayer.psm.GetState ().ToString ());
 				return;
 			}
 		}
-
 	}
 }

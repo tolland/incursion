@@ -40,8 +40,8 @@ namespace Oxide.Plugins
         [PluginReference]
         Plugin ZoneManager;
 
-        public EventStateManager esm;
-        static IncursionEvents incursionEvents = null;
+        public static EventStateManager esm;
+        private static IncursionEvents incursionEvents = null;
 
         #endregion
 
@@ -345,7 +345,7 @@ namespace Oxide.Plugins
                 //touch each player
                 foreach (BasePlayer player in BasePlayer.activePlayerList)
                 {
-                    IncursionEventGame.EventPlayer eplayer = IncursionEventGame.GetEventPlayer(player);
+                    IncursionEventGame.EventPlayer eplayer = IncursionEventGame.EventPlayer.GetEventPlayer(player);
                 }
 
 
@@ -444,7 +444,7 @@ namespace Oxide.Plugins
             IemUtils.DLog("player disconnected in IncursionEvents");
             esm.currentGameStateManager.eg.RemovePlayerFromTeams(player);
             IncursionEventGame.EventPlayer eventPlayer
-                     = IncursionEventGame.GetEventPlayer(player);
+                     = IncursionEventGame.EventPlayer.GetEventPlayer(player);
             eventPlayer.eventTeam.disconnectedPlayers.Add(eventPlayer.PlayerId);
 
         }
@@ -474,7 +474,7 @@ namespace Oxide.Plugins
                 {
                     //IemUtils.DLog("found player " + player.UserIDString);
                     IncursionEventGame.EventPlayer eventPlayer
-                        = IncursionEventGame.GetEventPlayer(player);
+                        = IncursionEventGame.EventPlayer.GetEventPlayer(player);
 
                     eventPlayer.psm.eg = esm.currentGameStateManager.eg;
 
@@ -684,7 +684,7 @@ namespace Oxide.Plugins
 
         public void ShowTeamSelectHud(BasePlayer player)
         {
-            IncursionEventGame.EventPlayer eventPlayer = IncursionEventGame.GetEventPlayer(player);
+            IncursionEventGame.EventPlayer eventPlayer = IncursionEventGame.EventPlayer.GetEventPlayer(player);
             //IemUtils.DLog("enabled is " + eventPlayer.isActiveAndEnabled);
 
             if (eventPlayer.psm.IsAny(IncursionEventGame.PlayerInTeamSelectHUD.Instance))
@@ -758,12 +758,18 @@ namespace Oxide.Plugins
             }
         }
 
+        static void RestoreUI(IncursionEventGame.EventPlayer eventPlayer)
+        {
+            IncursionUI.CreateSchedulerStateManagerDebugBanner("state:" + esm.scheduler.GetState().ToString());
+            IncursionUI.CreateEventStateManagerDebugBanner("state:" + esm.GetState().ToString());
+        }
 
         /// <summary>
         /// this is called when the player respawns from dead, or after
         /// waking from sleep after connecting
         /// </summary>
         /// <param name="player"></param>
+        /// 
         void CheckPlayer(BasePlayer player)
         {
             Puts("calling check player");
@@ -775,14 +781,12 @@ namespace Oxide.Plugins
                 return;
             }
 
-            IncursionUI.CreateSchedulerStateManagerDebugBanner("state:" + esm.scheduler.GetState().ToString());
+            IncursionEventGame.EventPlayer eventPlayer = IncursionEventGame.EventPlayer.GetEventPlayer(player);
 
-            IncursionEventGame.EventPlayer eventPlayer = IncursionEventGame.GetEventPlayer(player);
+            IemUtils.DLog("psm is " + eventPlayer.psm);
 
-            IemUtils.DLog("player state is " + eventPlayer.psm.GetState());
-
-            IncursionUI.CreateEventStateManagerDebugBanner("state:" + esm.GetState().ToString());
-
+            RestoreUI(eventPlayer);
+            
             //@todo if this triggers its a bug, seems to happen after dead player reconnects
             if (eventPlayer.psm == null)
             {
@@ -830,6 +834,8 @@ namespace Oxide.Plugins
                 }
                 if(eventPlayer.eventTeam==null)
                     IemUtils.DLog("here");
+
+                
 
                 foreach (var team in esm.currentGameStateManager.eg.eventTeams.Values)
                 {
@@ -915,7 +921,7 @@ namespace Oxide.Plugins
                 BasePlayer player = victim.ToPlayer();
                 IncursionUI.RemoveTeamUIForPlayer(victim.ToPlayer());
                 IncursionEventGame.EventPlayer eventPlayer
-                       = IncursionEventGame.GetEventPlayer(player);
+                       = IncursionEventGame.EventPlayer.GetEventPlayer(player); 
 
                 //                if(eventPlayer.psm.IsAny(IncursionEventGame.Pl))
                 eventPlayer.psm.ChangeState(IncursionEventGame.PlayerDead.Instance);
