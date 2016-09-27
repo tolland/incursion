@@ -14,7 +14,7 @@ namespace Oxide.Plugins
     public class IncursionUI : RustPlugin
     {
 
-
+        #region inits
 
         [PluginReference]
         IemUtils IemUtils;
@@ -24,6 +24,8 @@ namespace Oxide.Plugins
         private static bool Debug = false;
 
         private static List<string> guiList = new List<string>();
+
+        #endregion
 
         #region Boiler plate
 
@@ -75,6 +77,8 @@ namespace Oxide.Plugins
 
         #endregion
 
+        #region timer guis
+
         public static void ShowCountDownTimerGui(BasePlayer player, string time)
         {
             string gui = "TimerGui";
@@ -108,6 +112,10 @@ namespace Oxide.Plugins
             }, mainName);
             CuiHelper.AddUi(player, elements);
         }
+
+        #endregion
+
+        #region in game banners
 
         public static void ShowGameBanner(BasePlayer player, List<string> message)
         {
@@ -227,7 +235,9 @@ namespace Oxide.Plugins
             CuiHelper.AddUi(player, container);
 
         }
+        #endregion
 
+        #region Debug banners
 
         public static void CreateEventStateManagerDebugBanner(string message)
         {
@@ -319,6 +329,8 @@ namespace Oxide.Plugins
             }
         }
 
+        #endregion
+
         public static void CreateEventMessage(string message)
         {
             string ARENA = $"msg: {message}";
@@ -342,6 +354,7 @@ namespace Oxide.Plugins
             }
         }
 
+        #region team lobby UIs
 
         public static void ShowTeamUi(List<UiTeam> teamData)
         {
@@ -368,6 +381,89 @@ namespace Oxide.Plugins
 
         }
 
+
+        public static
+            void ShowTeamUiForPlayer(BasePlayer player, List<UiTeam> teamData)
+        {
+
+            int teamSlot = 0;
+
+            string gui = "team_overlay";
+            guiList.Add(gui);
+            CuiHelper.DestroyUi(player, "team_overlay");
+
+            var container = Hud.CreateElementContainer(
+                                         "team_overlay",
+                                         "0.3 0.3 0.3 0.0",
+                                         "0.0 0.12",
+                                         "1.0 1.0",
+                                         false);
+
+            foreach (UiTeam item in teamData)
+            {
+                //IemUtils.DLog(item.TeamName);
+                CuiHelper.DestroyUi(player, item.TeamName);
+
+                //IemUtils.DLog("teamSlots[teamSlot,0] = " + teamSlots[teamSlot, 0]);
+                //IemUtils.DLog("teamSlots[teamSlot,1] = " + teamSlots[teamSlot, 1]);
+
+
+
+                Hud.CreatePanel(ref container,
+                    "team_overlay",
+                    "1.0 1.0 1.0 0.6",
+                    item.TeamName,
+                    14,
+                    teamSlots[teamSlot, 0],
+                    teamSlots[teamSlot, 1],
+                    TextAnchor.UpperCenter);
+
+                Hud.CreateLabel(ref container,
+                    "team_overlay",
+                    GetColor(item.Color),
+                    item.TeamName,
+                    22,
+                    teamSlots[teamSlot, 0],
+                    teamSlots[teamSlot, 1],
+                    TextAnchor.UpperCenter);
+
+
+
+
+
+                string playerListString = "\n\n";
+                foreach (string playerName in item.Players)
+                {
+                    playerListString = playerListString + playerName + "\n";
+                }
+
+                Hud.CreateLabel(ref container, "team_overlay", "",
+                    $"{playerListString}",
+                    18,
+                    teamSlots[teamSlot, 0],
+                    teamSlots[teamSlot, 1],
+                    TextAnchor.UpperCenter);
+
+                teamSlot++;
+            }
+            CuiHelper.AddUi(player, container);
+
+        }
+
+        public static
+            void UpdateTeamUi(List<UiTeam> teamData)
+        {
+
+
+            foreach (BasePlayer player in BasePlayer.activePlayerList)
+            {
+                ShowTeamUiForPlayer(player, teamData);
+            }
+        }
+
+        #endregion
+
+        #region game results
 
         public static void RemoveGameResultUI()
         {
@@ -489,6 +585,10 @@ namespace Oxide.Plugins
             }
         }
 
+        #endregion
+
+        #region utils
+
         public static string GetColor(string color)
         {
             switch (color)
@@ -512,84 +612,6 @@ namespace Oxide.Plugins
             return "1.0 1.0 1.0 0.6";
         }
 
-        public static
-            void ShowTeamUiForPlayer(BasePlayer player, List<UiTeam> teamData)
-        {
-
-            int teamSlot = 0;
-
-            string gui = "team_overlay";
-            guiList.Add(gui);
-            CuiHelper.DestroyUi(player, "team_overlay");
-
-            var container = Hud.CreateElementContainer(
-                                         "team_overlay",
-                                         "0.3 0.3 0.3 0.0",
-                                         "0.0 0.12",
-                                         "1.0 1.0",
-                                         false);
-
-            foreach (UiTeam item in teamData)
-            {
-                //IemUtils.DLog(item.TeamName);
-                CuiHelper.DestroyUi(player, item.TeamName);
-
-                //IemUtils.DLog("teamSlots[teamSlot,0] = " + teamSlots[teamSlot, 0]);
-                //IemUtils.DLog("teamSlots[teamSlot,1] = " + teamSlots[teamSlot, 1]);
-
-
-
-                Hud.CreatePanel(ref container,
-                    "team_overlay",
-                    "1.0 1.0 1.0 0.6",
-                    item.TeamName,
-                    14,
-                    teamSlots[teamSlot, 0],
-                    teamSlots[teamSlot, 1],
-                    TextAnchor.UpperCenter);
-
-                Hud.CreateLabel(ref container,
-                    "team_overlay",
-                    GetColor(item.Color),
-                    item.TeamName,
-                    22,
-                    teamSlots[teamSlot, 0],
-                    teamSlots[teamSlot, 1],
-                    TextAnchor.UpperCenter);
-
-
-
-
-
-                string playerListString = "\n\n";
-                foreach (string playerName in item.Players)
-                {
-                    playerListString = playerListString + playerName + "\n";
-                }
-
-                Hud.CreateLabel(ref container, "team_overlay", "",
-                    $"{playerListString}",
-                    18,
-                    teamSlots[teamSlot, 0],
-                    teamSlots[teamSlot, 1],
-                    TextAnchor.UpperCenter);
-
-                teamSlot++;
-            }
-            CuiHelper.AddUi(player, container);
-
-        }
-
-        public static
-            void UpdateTeamUi(List<UiTeam> teamData)
-        {
-
-
-            foreach (BasePlayer player in BasePlayer.activePlayerList)
-            {
-                ShowTeamUiForPlayer(player, teamData);
-            }
-        }
 
         class Hud
         {
@@ -722,6 +744,8 @@ namespace Oxide.Plugins
 
 
         }
+
+        #endregion
 
         void OnEntityDeath(BaseCombatEntity victim, HitInfo info)
         {
@@ -1023,6 +1047,8 @@ namespace Oxide.Plugins
             CuiHelper.AddUi(player, elements);
         }
 
+        #region server join gui
+
         public static void IntroGUI(BasePlayer player, string msg)
         {
             var elements = new CuiElementContainer();
@@ -1069,6 +1095,8 @@ namespace Oxide.Plugins
             elements.Add(Agree, mainName);
             CuiHelper.AddUi(player, elements);
         }
+
+        #endregion
 
         #region console control
 

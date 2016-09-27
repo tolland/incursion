@@ -368,7 +368,7 @@ namespace Oxide.Plugins
                 Start = newStart;
                 Length = newLength;
                 guid = Guid.NewGuid();
-                EventName = "Default Name";
+                EventName = "Default Team Game";
             }
 
             public ScheduledEventTeam GetTeam(string teamId)
@@ -411,7 +411,7 @@ namespace Oxide.Plugins
             //    Start = newStart;
             //    Length = newLength;
             //    guid = newGuid;
-            //    EventName = "Default Name";
+            //    EventName = "Default Team Game";
             //}
 
             public ScheduledEvent(DateTime newStart, int newLength, Guid newGuid, string newEventName)

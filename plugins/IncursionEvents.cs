@@ -90,7 +90,7 @@ namespace Oxide.Plugins
             Config.Clear();
             Config["EventManagementMode"] = "repeating";  //{"scheduled","repeating","once","manual"}
             Config["SchedulerEnabled"] = false;
-            Config["DefaultGame"] = "Example Team Game";
+            Config["DefaultGame"] = "Default Team Game";
             Config["AutoStart"] = true;
             Config["JoinMessage"] = "Welcome to this server";
             Config["LeaveMessage"] = "Goodbye";

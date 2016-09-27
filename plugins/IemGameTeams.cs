@@ -30,6 +30,8 @@ namespace Oxide.Plugins
         DynamicConfigFile incursionEventsConfig;
         private bool AutoStart = false;
 
+        #region boiler plate
+
         void Init()
         {
             iemGameTeams = this;
@@ -56,7 +58,7 @@ namespace Oxide.Plugins
                 throw new Exception("esm is null");
 
             //new instance of the Game State manager for this game
-            teamGameStateManager = new TeamGameStateManager(GameStateCreated.Instance, "Example Team Game");
+            teamGameStateManager = new TeamGameStateManager(GameStateCreated.Instance, "Default Team Game");
 
             //tell the event manager about this game
             esm.RegisterGameStateManager(teamGameStateManager);
@@ -77,6 +79,8 @@ namespace Oxide.Plugins
         {
             IemUtils.LogL("IemGameTeams: OnServerInitialized complete");
         }
+        
+        #endregion
 
         void OnRunPlayerMetabolism(PlayerMetabolism m, BaseCombatEntity entity)
         {
@@ -108,7 +112,7 @@ namespace Oxide.Plugins
 
         private TeamGameStateManager teamGameStateManager;
 
-        class TeamEventGame : IncursionEventGame.EventGame
+        public class TeamEventGame : IncursionEventGame.EventGame
         {
 
 
@@ -119,10 +123,10 @@ namespace Oxide.Plugins
                 FixedNumberOfTeams = true;
 
                 MinPlayers = 1;
-                MinPlayersPerTeam = 1;
+                MinPlayersPerTeam = 0;
 
                 TimedGame = true;
-                TimeLimit = 15;
+                TimeLimit = 1500;
 
                 GameLobbyWait = 15;
             }

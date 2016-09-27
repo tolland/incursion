@@ -498,6 +498,16 @@ namespace Oxide.Plugins
                 IemUtils.DLog("calling constructor in eventplayer monobehavior");
             }
 
+            void OnDestroy()
+            {
+                IemUtils.DLog("calling OnDestroy in eventplayer monobehavior");
+            }
+
+            ~EventPlayer()  // destructor
+            {
+                IemUtils.DLog("calling Destructor in eventplayer monobehavior");
+            }
+
             public static EventPlayer GetEventPlayer(BasePlayer player)
             {
                 Plugins.IemUtils.DLog(player.UserIDString);
@@ -550,6 +560,8 @@ namespace Oxide.Plugins
             public IemUtils.ScheduledEvent nextEvent;
             // cached the last game banner message for players who were not connected during the state transition
             public string cachedGameBanner = "";
+
+            
 
             public GameStateManager(IncursionStateManager.IStateMachine initialState, string name) : base(initialState)
             {
