@@ -58,13 +58,8 @@ namespace Oxide.Plugins
 
         void Loaded()
         {
-
-
             esm = new EventStateManager(PluginLoaded.Instance);
             //IemUtils.LogL("IncursionEvents: Loaded complete");
-
-
-
         }
 
         void Unload()
@@ -88,7 +83,7 @@ namespace Oxide.Plugins
         {
             PrintWarning("Creating a new configuration file");
             Config.Clear();
-            Config["EventManagementMode"] = "repeating";  //{"scheduled","repeating","once","manual"}
+            Config["EventManagementMode"] = "repeating"; //{"scheduled","repeating","once","manual"}
             Config["SchedulerEnabled"] = false;
             Config["DefaultGame"] = "Default Team Game";
             Config["AutoStart"] = true;
@@ -142,7 +137,9 @@ namespace Oxide.Plugins
         {
             //process the list of teams and players who are preregistered for this
             //scheduled event into the concrete game event
-            foreach (IemUtils.ScheduledEvent.ScheduledEventTeam seteam in esm.currentGameStateManager.nextEvent.schTeams.Values)
+            foreach (
+                IemUtils.ScheduledEvent.ScheduledEventTeam seteam in
+                esm.currentGameStateManager.nextEvent.schTeams.Values)
             {
                 //Plugins.IemUtils.DLog("team is " + seteam.TeamName);
                 foreach (IemUtils.ScheduledEvent.ScheduledEventPlayer scheduledEventPlayer in seteam.schPlayers.Values)
@@ -170,8 +167,10 @@ namespace Oxide.Plugins
         public class EventStateManager : IncursionStateManager.StateManager
         {
             public IncursionHoldingArea.Lobby eventLobby;
+
             public Dictionary<string, IncursionEventGame.GameStateManager> gameStateManagers
                 = new Dictionary<string, IncursionEventGame.GameStateManager>();
+
             public IncursionEventGame.GameStateManager currentGameStateManager;
             public IncursionStateManager.StateManager scheduler;
             public string cachedEventBanner = "";
@@ -213,6 +212,19 @@ namespace Oxide.Plugins
             {
                 gameStateManagers.Add(gameStateManager.Name, gameStateManager);
                 //currentGameStateManager = gameStateManager;
+            }
+
+            public void UnregisterGameStateManager(
+                IncursionEventGame.GameStateManager gameStateManager)
+            {
+                gameStateManagers.Remove(gameStateManager.Name);
+                if (currentGameStateManager == gameStateManager)
+                {
+                    if (gameStateManagers.Count > 0)
+                    {
+                        currentGameStateManager = gameStateManagers.Values.First();
+                    }
+                }
             }
 
 
@@ -283,7 +295,10 @@ namespace Oxide.Plugins
                 {
                     //IemUtils.SLog("not game loaded here:" + GetState());
                 }
+            }
 
+            static void ShowRegisteredGames()
+            {
 
             }
         }
@@ -403,7 +418,7 @@ namespace Oxide.Plugins
                 //work with the child class methods
                 EventStateManager esm = ((EventStateManager)sm);
 
-                IemUtils.DLog((string) incursionEvents.Config["EventManagementMode"]);
+                IemUtils.DLog((string)incursionEvents.Config["EventManagementMode"]);
                 switch ((string)incursionEvents.Config["EventManagementMode"])
                 {
                     // make the gsm available and open the event lobby
@@ -473,20 +488,21 @@ namespace Oxide.Plugins
         {
             esm.currentGameStateManager.eg.RemovePlayerFromTeams(player);
             IncursionEventGame.EventPlayer eventPlayer
-                     = IncursionEventGame.EventPlayer.GetEventPlayer(player);
-            if (eventPlayer.eventTeam!=null)
+                = IncursionEventGame.EventPlayer.GetEventPlayer(player);
+            if (eventPlayer.eventTeam != null)
                 eventPlayer.eventTeam.disconnectedPlayers.Add(eventPlayer.PlayerId);
-            
-            
+
+
 
         }
+
         /// <summary>
         /// players can join teams
         /// there should be a game state manager registered, and an eventgame available
         /// to enter in here
         /// </summary>
         public class EventLobbyOpen : IncursionStateManager.StateBase<EventLobbyOpen>,
-        IncursionStateManager.IStateMachine
+            IncursionStateManager.IStateMachine
         {
             public new void Enter(IncursionStateManager.StateManager sm)
             {
@@ -572,7 +588,8 @@ namespace Oxide.Plugins
         /// <summary>
         ///  players are not yet moved to the playing field, but joining teams is now closed
         /// </summary>
-        public class EventLobbyClosed : IncursionStateManager.StateBase<EventLobbyClosed>, IncursionStateManager.IStateMachine
+        public class EventLobbyClosed : IncursionStateManager.StateBase<EventLobbyClosed>,
+            IncursionStateManager.IStateMachine
         {
             public new void Enter(IncursionStateManager.StateManager esm)
             {
@@ -733,19 +750,33 @@ namespace Oxide.Plugins
 
         void OnEnterZone(string ZoneID, BasePlayer player)
         {
-            if (esm != null)
+            try
             {
-                IemUtils.DLog(esm.GetState().ToString());
-                if (esm.GetState().Equals(EventLobbyOpen.Instance))
+
+                if (esm != null)
                 {
-                    //is this a team zone?
-                    if (ZoneID.StartsWith("zone_team_"))
+                    IemUtils.DLog(esm.GetState().ToString());
+                    if (esm.GetState().Equals(EventLobbyOpen.Instance))
                     {
-                        OnPlayerEnterTeamArea(player, GetTeamFromZone(ZoneID));
+                        //is this a team zone?
+                        if (ZoneID.StartsWith("zone_team_"))
+                        {
+                            OnPlayerEnterTeamArea(player, GetTeamFromZone(ZoneID));
+                        }
                     }
                 }
-            }
 
+            }
+            catch (NullReferenceException e)
+            {
+                IemUtils.DLog(String.Format("IOException source: {0}", e.Source));
+                IemUtils.DLog(String.Format("IOException : {0}", e));
+                IemUtils.DLog(String.Format("IOException : {0}", e.StackTrace));
+                IemUtils.DLog(String.Format("IOException : {0}", e.TargetSite));
+                IemUtils.DLog(String.Format("IOException : {0}", e.GetType()));
+                IemUtils.DLog(String.Format("IOException : {0}", e.InnerException));
+                throw;
+            }
         }
 
 
@@ -822,7 +853,7 @@ namespace Oxide.Plugins
 
             IemUtils.DLog("psm is " + eventPlayer.psm);
 
-            
+
             //@todo if this triggers its a bug, seems to happen after dead player reconnects
             if (eventPlayer.psm == null)
             {
@@ -866,10 +897,10 @@ namespace Oxide.Plugins
                         }
                     }
                 }
-                if(eventPlayer.eventTeam==null)
+                if (eventPlayer.eventTeam == null)
                     IemUtils.DLog("here");
 
-                
+
 
                 foreach (var team in esm.currentGameStateManager.eg.eventTeams.Values)
                 {
@@ -955,7 +986,7 @@ namespace Oxide.Plugins
                 BasePlayer player = victim.ToPlayer();
                 IncursionUI.RemoveTeamUIForPlayer(victim.ToPlayer());
                 IncursionEventGame.EventPlayer eventPlayer
-                       = IncursionEventGame.EventPlayer.GetEventPlayer(player); 
+                       = IncursionEventGame.EventPlayer.GetEventPlayer(player);
 
                 //                if(eventPlayer.psm.IsAny(IncursionEventGame.Pl))
                 eventPlayer.psm.ChangeState(IncursionEventGame.PlayerDead.Instance);
@@ -1092,10 +1123,33 @@ namespace Oxide.Plugins
                     SendReply(arg, "joining random team");
                     //PauseGame();
                     return;
+                case "games_loaded":
+                    SendReply(arg, "listing available games");
+                    //EventStateManager.ShowRegisteredGames();
+                    foreach (var gameStateManager in esm.gameStateManagers)
+                    {
+                        if (gameStateManager.Value.Equals(esm.currentGameStateManager))
+                            SendReply(arg, " -" + gameStateManager.Key + " (current)");
+                        else
+                            SendReply(arg, " -" + gameStateManager.Key);
+                    }
+                    break;
+                case "game_select":
+                    SendReply(arg, "selecting game");
+                    //EventStateManager.ShowRegisteredGames();
+                    foreach (var gameStateManager in esm.gameStateManagers)
+                    {
+                        if (gameStateManager.Key.ToLower().StartsWith(
+                            arg.Args[1].ToLower()))
+                        {
+                            SendReply(arg, "setting game to: " + gameStateManager.Key);
+                            esm.currentGameStateManager = gameStateManager.Value;
+                            Config["DefaultGame"] = gameStateManager.Key;
+                        }
 
+                    }
 
-
-
+                    return;
             }
         }
 

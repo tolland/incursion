@@ -41,7 +41,10 @@ namespace Oxide.Plugins
         // General Methods
         //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-        string GetMsg(string key, object steamid = null) { return lang.GetMessage(key, this, steamid == null ? null : steamid.ToString()); }
+        string GetMsg(string key, object steamid = null)
+        {
+            return lang.GetMessage(key, this, steamid == null ? null : steamid.ToString());
+        }
         bool hasAccess(BasePlayer player, string permissionName) { if (player.net.connection.authLevel > 1) return true; return permission.UserHasPermission(player.userID.ToString(), permissionName); }
 
         bool FindRayEntity(Vector3 sourcePos, Vector3 sourceDir, out Vector3 point, out BaseEntity entity)
@@ -450,7 +453,7 @@ namespace Oxide.Plugins
         // Placeback
         //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-        object TryPlaceback(string filename, BasePlayer player, string[] args)
+        public object TryPlaceback(string filename, BasePlayer player, string[] args)
         {
             string path = subDirectory + filename;
 

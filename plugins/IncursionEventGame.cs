@@ -143,12 +143,7 @@ namespace Oxide.Plugins
 
                 GameLobbyWait = 30;
 
-                eventTeams.Add("team_1", new EventTeam("team_1", "Blue Team",
-                    new Vector3(-394, 3, -25), "blue"));
-                eventTeams.Add("team_2", new EventTeam("team_2", "Red Team",
-                    new Vector3(-376, 3, 3), "red"));
-                //eventTeams.Add("team_3", new EventTeam("team_3", "Green Team", "green"));
-                //eventTeams.Add("team_4", new EventTeam("team_4", "Yellow Team", "yellow"));
+
 
                 //support rulesGUI format??
                 GameIntroBanner = new List<string> {
@@ -299,9 +294,19 @@ namespace Oxide.Plugins
             public EventTeam GetTeamById(string teamId)
             {
                 if (eventTeams == null)
-                    Plugins.IemUtils.DLog("eventTeams is null");
+                    IemUtils.DLog("eventTeams is null");
 
-                return eventTeams[teamId];
+                if(eventTeams.ContainsKey(teamId))
+                    return eventTeams[teamId];
+                else
+                {
+                    IemUtils.DLog("eventTeams does not contain key: "+teamId);
+                    foreach (string eventTeamsKey in eventTeams.Keys)
+                    {
+                        IemUtils.DLog("key: " + eventTeamsKey);
+                    }
+                    return null;
+                }
 
             }
 
@@ -596,7 +601,8 @@ namespace Oxide.Plugins
 
             public virtual void ReinitializeGame()
             {
-                eg = new IncursionEventGame.EventGame(this);
+                //eg = new IncursionEventGame.EventGame(this);
+                throw new NotImplementedException();
             }
 
             public virtual void UnloadGame()

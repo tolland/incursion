@@ -16,6 +16,7 @@ namespace Oxide.Plugins
     [Info("Incursion Team Game", "tolland", "0.1.0")]
     class IemGameTeams : RustPlugin
     {
+
         [PluginReference]
         IncursionEvents IncursionEvents;
 
@@ -74,6 +75,10 @@ namespace Oxide.Plugins
             IemUtils.LogL("IemGameTeams: Loaded complete");
         }
 
+        void Unload()
+        {
+            teamGameStateManager.ChangeState(GameUnloaded.Instance);
+        }
 
         private void OnServerInitialized()
         {
@@ -129,6 +134,13 @@ namespace Oxide.Plugins
                 TimeLimit = 1500;
 
                 GameLobbyWait = 15;
+
+                eventTeams.Add("team_1", new IncursionEventGame.EventTeam("team_1", "Blue Team",
+    new Vector3(-394, 3, -25), "blue"));
+                eventTeams.Add("team_2", new IncursionEventGame.EventTeam("team_2", "Red Team",
+                    new Vector3(-376, 3, 3), "red"));
+                //eventTeams.Add("team_3", new EventTeam("team_3", "Green Team", "green"));
+                //eventTeams.Add("team_4", new EventTeam("team_4", "Yellow Team", "yellow"));
             }
 
 
@@ -524,6 +536,8 @@ namespace Oxide.Plugins
             public new void Enter(IncursionStateManager.StateManager gsm)
             {
                 //@todo need to clean up game playing field here
+                IncursionEvents.esm.UnregisterGameStateManager(
+                    iemGameTeams.teamGameStateManager);
             }
         }
 
