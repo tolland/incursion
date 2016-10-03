@@ -7,7 +7,11 @@ using UnityEngine;
 using Random = System.Random;
 using System.Collections.Generic;
 using System.IO;
+using ConVar;
+using Oxide.Core.Plugins;
+using UnityEngine;
 using Oxide.Core;
+using Physics = UnityEngine.Physics;
 
 namespace Oxide.Plugins
 {
@@ -18,8 +22,10 @@ namespace Oxide.Plugins
 
         [PluginReference]
         Plugin ZoneManager;
-        static Oxide.Game.Rust.Libraries.Rust rust = GetLibrary<Oxide.Game.Rust.Libraries.Rust>();
-        static FieldInfo monumentsField = typeof(TerrainPath).GetField("Monuments", (BindingFlags.Public | BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
+        static Game.Rust.Libraries.Rust rust = GetLibrary<Game.Rust.Libraries.Rust>();
+        static FieldInfo monumentsField = typeof(TerrainPath).GetField("Monuments",
+            (BindingFlags.Public | BindingFlags.Static | BindingFlags.Instance |
+            BindingFlags.NonPublic));
         public static List<MonumentInfo> monuments = new List<MonumentInfo>();
 
         static IemUtils iemUtils = null;
@@ -66,6 +72,14 @@ namespace Oxide.Plugins
         }
 
 
+        public static void InitHealthState(BasePlayer player)
+        {
+            player.metabolism.calories.value = 500;
+            player.health = 100;
+            player.metabolism.hydration.value = 250;
+        }
+
+
 
         #endregion
 
@@ -106,14 +120,14 @@ namespace Oxide.Plugins
 
         public static void DLog(string message)
         {
-            ConVar.Server.Log("oxide/logs/ESMlog.txt", message);
+            Server.Log("oxide/logs/ESMlog.txt", message);
             iemUtils.Puts(message);
             //Interface.Oxide.LogInfo("[{0}] {1}", (object)this.Title, (object)(args.Length <= 0 ? format : string.Format(format, args)));
         }
 
         public static void SLog(string strMessage)
         {
-            ConVar.Server.Log("oxide/logs/Statelog.txt", strMessage);
+            Server.Log("oxide/logs/Statelog.txt", strMessage);
             //string strFilename = "oxide/logs/Statelog.txt";
             ////iemUtils.Puts(message);
             //File.AppendAllText(string.Format("{0}/{1}", (object)ConVar.Server.rootFolder, (object)strFilename), string.Format("[{0}] {1}\r\n", (object)DateTime.Now.ToString(), (object)strMessage));
@@ -121,26 +135,26 @@ namespace Oxide.Plugins
 
         public static void DDLog(string message)
         {
-            ConVar.Server.Log("oxide/logs/DDlog.txt", message);
+            Server.Log("oxide/logs/DDlog.txt", message);
             //iemUtils.Puts(message);
         }
 
         public static void SchLog(string message)
         {
-            ConVar.Server.Log("oxide/logs/schedlog.txt", message);
+            Server.Log("oxide/logs/schedlog.txt", message);
             //iemUtils.Puts(message);
         }
 
         public static void TimerLog(string message)
         {
-            ConVar.Server.Log("oxide/logs/timerlog.txt", message);
+            Server.Log("oxide/logs/timerlog.txt", message);
             //iemUtils.Puts(message);
         }
 
         public static void LogL(string message)
         {
-            ConVar.Server.Log("oxide/logs/Loadlog.txt", message);
-            ConVar.Server.Log("oxide/logs/ESMlog.txt", message);
+            Server.Log("oxide/logs/Loadlog.txt", message);
+            Server.Log("oxide/logs/ESMlog.txt", message);
             //iemUtils.Puts(message);
         }
 
@@ -151,7 +165,7 @@ namespace Oxide.Plugins
             if (player != null)
             {
                 if (args.Length > 0)
-                    message = string.Format(message, args);
+                    message = String.Format(message, args);
                 iemUtils.SendReply(player, $"{prefix}{message}");
             }
             else
@@ -212,29 +226,53 @@ namespace Oxide.Plugins
 
         #region finding stuff
 
-        static int doorColl = UnityEngine.LayerMask.GetMask(new string[] { "Construction Trigger", "Construction" });
-
-
-        T FindComponentNearestToLocation<T>(Vector3 location, int radius)
+        static int doorColl = LayerMask.GetMask(new string[]
         {
-            T component = default(T);
-            foreach (Collider col in Physics.OverlapSphere(location, 2f, doorColl))
+            "Construction Trigger", "Construction"
+        });
+        
+        static int collisionLayer = LayerMask.GetMask("Construction", "Construction Trigger",
+            "Trigger", "Deployed", "Default");
+
+        // TODO maybe find the nearest collider?
+        public static T FindComponentNearestToLocation<T>(Vector3 location, int radius)
+        {
+            T component = default(T); 
+
+           // IemUtils.DDLog("in search at location " + location);
+
+            float dist = 9999; 
+            foreach (Collider col in Physics.OverlapSphere(location, radius))
             {
-                if (col.GetComponentInParent<Door>() == null) continue;
+               // IemUtils.DDLog("collider " + col.name);
+                if (col.GetComponentInParent<T>() == null) continue;
 
+                //IemUtils.DDLog("not null collider " + col.GetComponentInParent<T>().ToString());
 
-                if (Mathf.Ceil(col.transform.position.x) == Mathf.Ceil(location.x)
-                    && Mathf.Ceil(col.transform.position.y) == Mathf.Ceil(location.y)
-                    && Mathf.Ceil(col.transform.position.z) == Mathf.Ceil(location.z))
+                //IemUtils.DDLog("colx=" + col.transform.position.x);
+                //IemUtils.DDLog("locx=" + location.x);
+                //IemUtils.DDLog("coly=" + col.transform.position.y);
+                //IemUtils.DDLog("locy=" + location.y);
+                //IemUtils.DDLog("colz=" + col.transform.position.z);
+                //IemUtils.DDLog("locz=" + location.z);
+
+                float tempdist = Vector3.Distance(location, col.transform.position);
+
+                //IemUtils.DDLog("dist is " + tempdist);
+
+                if (tempdist < dist)
                 {
-                    //Plugins.IemUtils.DLog("found the door");
+                    dist = tempdist;
                     component = col.GetComponentInParent<T>();
                 }
+                
+
             }
             if (component != null)
                 return component;
             return default(T);
         }
+
 
         public static BasePlayer FindPlayerByID(ulong steamid)
         {
@@ -251,12 +289,130 @@ namespace Oxide.Plugins
             return null;
         }
 
+        public static BasePlayer FindPlayerByID(string steamid)
+        {
+            return FindPlayerByID(UInt64.Parse(steamid));
+        }
+
+        // found objects with TODO make this better
+        public static List<GameObject> FindObjectsByPrefab(string prefab)
+        {
+            GameObject[] allobjects = UnityEngine.Object.FindObjectsOfType<GameObject>();
+
+            List<GameObject> foundobjects = new List<GameObject>();
+
+            foreach (var monument_gobject in allobjects)
+            {
+                //DLog("object is " + monument_gobject.name);
+
+                if (monument_gobject.name.EndsWith(prefab))
+                {
+                    //Puts (gobject.GetInstanceID ().ToString ());
+                    //var pos = monument_gobject.transform.position;
+                    //Puts(pos.ToString());
+                    foundobjects.Add(monument_gobject);
+                }
+            }
+
+            return foundobjects;
+        }
+
+        // found objects with TODO make this better
+        public static GameObject FindObjectByID(int id)
+        {
+            GameObject[] allobjects = UnityEngine.Object.FindObjectsOfType<GameObject>();
+
+            //List<GameObject> foundobjects = new List<GameObject>();
+
+            foreach (var gobject in allobjects)
+            {
+                //DLog("object is " + monument_gobject.name);
+
+                if (gobject.GetInstanceID() == id)
+                {
+                    //Puts (gobject.GetInstanceID ().ToString ());
+                    //var pos = monument_gobject.transform.position;
+                    //Puts(pos.ToString());
+                    return gobject;
+                }
+            }
+
+            return null;
+        }
+
+       // public static GameObject FindObjectAtLocation(string prefab, Vector3 location)
+       // {
+            
+       // }
+
+        public static BaseEntity FindBaseEntityByNetId(uint netId)
+        {
+
+            var foundentities = UnityEngine.Object.FindObjectsOfType<BaseEntity>();
+            foreach (var entity in foundentities)
+            {
+                if (entity.net.ID == netId)
+                    return entity;
+            }
+            return null;
+        }
+
+        private static readonly FieldInfo serverInputField 
+            = typeof(BasePlayer).GetField("serverInput", BindingFlags.Instance | 
+                BindingFlags.NonPublic);
+        private static readonly FieldInfo instancesField 
+            = typeof(MeshColliderBatch).GetField("instances", BindingFlags.Instance | 
+                BindingFlags.NonPublic);
+
+        public static Stack<BuildingBlock> GetTargetBuildingBlock(BasePlayer player)
+        {
+            var input = serverInputField?.GetValue(player) as InputState;
+            if (input == null) return null;
+            var direction = Quaternion.Euler(input.current.aimAngles);
+            var stack = new Stack<BuildingBlock>();
+            RaycastHit initial_hit;
+            if (!Physics.Raycast(new Ray(player.transform.position + new Vector3(0f, 1.5f, 0f), direction * Vector3.forward), out initial_hit, 150f) || initial_hit.collider is TerrainCollider)
+                return stack;
+            var entity = initial_hit.collider.GetComponentInParent<BuildingBlock>();
+            if (entity != null) stack.Push(entity);
+            else
+            {
+                var batch = initial_hit.collider?.GetComponent<MeshColliderBatch>();
+                if (batch == null) return stack;
+                var colliders = (ListDictionary<Component, ColliderCombineInstance>)instancesField.GetValue(batch);
+                if (colliders == null) return stack;
+                foreach (var instance in colliders.Values)
+                {
+                    entity = instance.collider?.GetComponentInParent<BuildingBlock>();
+                    if (entity == null) continue;
+                    stack.Push(entity);
+                }
+            }
+            return stack;
+        }
+
+        public static BuildingBlock GetTargetedBuildingBlock(BasePlayer player)
+        {
+            var input = serverInputField?.GetValue(player) as InputState;
+            if (input == null) return null;
+            var direction = Quaternion.Euler(input.current.aimAngles);
+            var stack = new Stack<BuildingBlock>();
+            RaycastHit initial_hit;
+            if (!Physics.Raycast(new Ray(player.transform.position + new Vector3(0f, 1.5f, 0f), direction * Vector3.forward), out initial_hit, 150f) || initial_hit.collider is TerrainCollider)
+                return null;
+            var entity = initial_hit.collider.GetComponentInParent<BuildingBlock>();
+            if (entity != null) return entity;
+            IemUtils.DDLog("NotLookingAt null");
+            return null;
+        }
+
         #endregion
 
         #region formatting
 
 
         static double RoundToSignificantDigits(double d, int digits)
+
         {
             if (d == 0)
                 return 0;
@@ -291,34 +447,67 @@ namespace Oxide.Plugins
             return position;
         }
 
+        public static void PlaySound(BasePlayer player)
+        {
 
-        //static void TeleportPlayerPosition(BasePlayer player, Vector3 destination)
-        //{
-        //    //DLog("teleporting player from " + player.transform.position.ToString());
-        //    //DLog("teleporting player to   " + destination.ToString());
-        //    player.MovePosition(destination);
-        //    player.ClientRPCPlayer(null, player, "ForcePositionTo", destination);
-        //    player.SetPlayerFlag(BasePlayer.PlayerFlags.ReceivingSnapshot, true);
-        //    player.UpdateNetworkGroup();
-        //    player.SendNetworkUpdateImmediate(false);
-        //    player.ClientRPCPlayer(null, player, "StartLoading", null, null, null, null, null);
-        //    player.SendFullSnapshot();
-        //}
+            Effect effectP = new Effect(
+                "assets/prefabs/instruments/guitar/effects/guitarpluck.prefab",
+                new Vector3(0, 0, 0), Vector3.forward);
+            Effect effectS = new Effect(
+                "assets/prefabs/instruments/guitar/effects/guitarpluck.prefab",
+                new Vector3(0, 0, 0), Vector3.forward);
+
+
+            effectP.worldPos = player.transform.position;
+            effectP.origin = player.transform.position;
+            effectP.scale = 0;
+            // EffectNetwork.Send(effectP);
+            effectP.scale = 1;
+            //EffectNetwork.Send(effectP);
+        }
+
+
+        public static void TeleportPlayerPosition(BasePlayer player, Vector3 destination)
+        {
+            //DLog("teleporting player from " + player.transform.position.ToString());
+            //DLog("teleporting player to   " + destination.ToString());
+            destination = GetGroundY(destination);
+            player.MovePosition(destination);
+            player.ClientRPCPlayer(null, player, "ForcePositionTo", destination);
+            player.SetPlayerFlag(BasePlayer.PlayerFlags.ReceivingSnapshot, true);
+            player.UpdateNetworkGroup();
+            player.SendNetworkUpdateImmediate(false);
+            player.ClientRPCPlayer(null, player, "StartLoading", null, null, null, null, null);
+            player.SendFullSnapshot();
+        }
 
         public static void MovePlayerTo(BasePlayer player, Vector3 loc)
         {
-            DLog("moving player "+player.UserIDString);
+            DLog("moving player " + player.UserIDString);
             if (player.inventory.loot.IsLooting())
             {
                 player.EndLooting();
             }
             player.CancelInvoke("InventoryUpdate");
             player.inventory.crafting.CancelAll(true);
+            loc = GetGroundY(loc);
             rust.ForcePlayerPosition(player, loc.x, loc.y, loc.z);
             player.SendNetworkUpdateImmediate();
         }
 
-        static Random random = new System.Random();
+        //TODO implement this with SQr values?
+        public static bool CheckPointNearToLocation(Vector3 location1, Vector3 location2, float radius)
+        {
+            double buf = Math.Sqrt(Math.Pow(location1.x - location2.x, 2) +
+                      Math.Pow(location1.y - location2.y, 2) +
+                      Math.Pow(location1.z - location2.z, 2));
+            DLog("distance is " + buf);
+            if (radius > buf)
+                return true;
+            return false;
+        }
+
+        static Random random = new Random();
 
         public static Vector3 GetRandomPointOnCircle(Vector3 centre, float radius)
         {
@@ -350,8 +539,8 @@ namespace Oxide.Plugins
 
         #region scheduled event global
 
-        public Dictionary<Guid, IemUtils.ScheduledEvent> scheduledEvents =
-    new Dictionary<Guid, IemUtils.ScheduledEvent>();
+        public Dictionary<Guid, ScheduledEvent> scheduledEvents =
+    new Dictionary<Guid, ScheduledEvent>();
 
         public class ScheduledEvent
         {
@@ -535,6 +724,79 @@ namespace Oxide.Plugins
                     schTeam = newSchEventTeam;
                 }
             }
+        }
+
+        #endregion
+
+        #region base types
+
+        public enum State
+        {
+            Before,
+            Running,
+            Paused,
+            Cancelled,
+            Complete
+        };
+
+
+
+        public interface IIemGame
+        {
+            string Name { get; set; }
+
+            IemUtils.State CurrentState { get; set; }
+            DateTime StartedTime { get; set; }
+            DateTime EndedTime { get; set; }
+
+            //is static method
+            //IemGame CreateGame(string gamename);
+            bool CanStart();
+            bool StartGame();
+            bool EndGame();
+            bool CancelGame();
+            bool PauseGame();
+            bool CleanUp();
+        }
+
+        public interface IIemTeamGame
+        {
+
+            Dictionary<string, IemUtils.IIemTeam> Teams { get; set; }
+            Dictionary<string, IemUtils.IIemTeamPlayer> Players { get; set; }
+            int MinTeams { get; set; }
+            int MaxTeams { get; set; }
+            IemUtils.IIemTeam Winner();
+        }
+
+        public enum PlayerState
+        {
+            Alive,
+            Dead
+        };
+
+        public interface IIemTeamPlayer
+        {
+            string PlayerId { get; set; }
+            string Name { get; set; }
+            IIemTeam Team { get; set; }
+            IIemTeamGame TeamGame { get; set; }
+            int Score { get; set; }
+            PlayerState PlayerState { get; set; }
+        }
+
+        public interface IIemTeam
+        {
+            string Name { get; set; }
+            Dictionary<string, IemUtils.IIemTeamPlayer> Players { get; set; }
+            int MaxPlayers { get; set; }
+            int MinPlayers { get; set; }
+            int Score { get; set; }
+
+            //is static method
+            //IemGame CreateGame(string gamename);
+            void AddPlayer(IIemTeamPlayer player);
+            void RemovePlayer(IIemTeamPlayer player);
         }
 
         #endregion
