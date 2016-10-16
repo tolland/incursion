@@ -5,13 +5,11 @@ using System.Collections.Generic;
 using Oxide.Core.Plugins;
 using UnityEngine;
 using Random = System.Random;
-using System.Collections.Generic;
 using System.IO;
 using ConVar;
-using Oxide.Core.Plugins;
-using UnityEngine;
 using Oxide.Core;
 using Physics = UnityEngine.Physics;
+using Rust;
 
 namespace Oxide.Plugins
 {
@@ -19,7 +17,7 @@ namespace Oxide.Plugins
     [Info("Incursion Utilities", "tolland", "0.1.0")]
     public class IemUtils : RustPlugin
     {
-
+        #region boilerplate
         [PluginReference]
         Plugin ZoneManager;
         static Game.Rust.Libraries.Rust rust = GetLibrary<Game.Rust.Libraries.Rust>();
@@ -29,10 +27,12 @@ namespace Oxide.Plugins
         public static List<MonumentInfo> monuments = new List<MonumentInfo>();
 
         static IemUtils iemUtils = null;
+        static IemUtils me = null;
 
         void Init()
         {
             iemUtils = this;
+            me = this;
             LogL("");
             LogL("Init in iemutils");
         }
@@ -48,7 +48,41 @@ namespace Oxide.Plugins
             LogL("iemutils: server initialized");
         }
 
+        #endregion
+
         #region player modifications
+
+        private readonly HashSet<ulong> teleporting = new HashSet<ulong>();
+
+        void OnEntityTakeDamage(BaseCombatEntity entity, HitInfo hitinfo)
+        {
+            var player = entity.ToPlayer();
+
+            if (hitinfo.damageTypes.Has(DamageType.Fall))
+            {
+                me.Puts("detected fall damage in teleport");
+                if (teleporting.Contains(player.userID))
+                {
+                    me.Puts("splatting fall damage in teleport");
+                    hitinfo.damageTypes = new DamageTypeList();
+                    teleporting.Remove(player.userID);
+                }
+            }
+
+            if (player == null || hitinfo == null) return;
+        }
+
+        void OnPlayerSleepEnded(BasePlayer player)
+        {
+            if (teleporting.Contains(player.userID))
+                timer.Once(3, () => { teleporting.Remove(player.userID); });
+        }
+
+        void OnPlayerDisconnected(BasePlayer player)
+        {
+            teleporting.Remove(player.userID);
+        }
+
 
         public static void SetMetabolismValues(BasePlayer player)
         {
@@ -79,7 +113,42 @@ namespace Oxide.Plugins
             player.metabolism.hydration.value = 250;
         }
 
+        public static void NullifyDamage(ref HitInfo info)
+        {
+            info.damageTypes = new DamageTypeList();
+            info.HitMaterial = 0;
+            info.PointStart = Vector3.zero;
+        }
 
+        public static void ClearInventory(BasePlayer player)
+        {
+            //TODO should save and restore inventory
+            player.inventory.Strip();
+        }
+        private Timer _timer;
+
+        private class FrozenPlayerInfo
+        {
+            public BasePlayer Player { get; set; }
+            public Vector3 FrozenPosition { get; set; }
+
+            public FrozenPlayerInfo(BasePlayer player)
+            {
+                Player = player;
+                FrozenPosition = player.transform.position;
+            }
+        }
+
+        List<FrozenPlayerInfo> frozenPlayers = new List<FrozenPlayerInfo>();
+        void OnTimer()
+        {
+            foreach (FrozenPlayerInfo current in frozenPlayers)
+            {
+                if (Vector3.Distance(current.Player.transform.position, current.FrozenPosition) < 1) continue;
+                current.Player.ClientRPCPlayer(null, current.Player, "ForcePositionTo", new object[] { current.FrozenPosition });
+                current.Player.TransformChanged();
+            }
+        }
 
         #endregion
 
@@ -99,7 +168,7 @@ namespace Oxide.Plugins
         {
             if (arg.connection?.authLevel < 1)
             {
-                SendReply(arg, GetMessage("MessagesPermissionsNotAllowed"));
+                SendReply(arg, "MessagesPermissionsNotAllowed");
                 return false;
             }
             return true;
@@ -136,6 +205,12 @@ namespace Oxide.Plugins
         public static void DDLog(string message)
         {
             Server.Log("oxide/logs/DDlog.txt", message);
+            //iemUtils.Puts(message);
+        }
+
+        public static void GLog(string message)
+        {
+            Server.Log("oxide/logs/Glog.txt", message);
             //iemUtils.Puts(message);
         }
 
@@ -184,7 +259,7 @@ namespace Oxide.Plugins
 
         public static void CreateZone(string name, Vector3 location, int radius)
         {
-            //iemUtils.Puts("creating zone");
+            iemUtils.Puts("creating zone at " + location);
 
             //ZoneManager.Call("EraseZone", "zone_" + name);
 
@@ -206,7 +281,7 @@ namespace Oxide.Plugins
 
         private const string SphereEnt = "assets/prefabs/visualization/sphere.prefab";
 
-        public static void CreateSphere(Vector3 position, float radius)
+        public static BaseEntity CreateSphere(Vector3 position, float radius)
         {
             // Puts("CreateSphere works!");
             BaseEntity sphere = GameManager.server.CreateEntity(SphereEnt,
@@ -217,7 +292,7 @@ namespace Oxide.Plugins
             ent.currentRadius = radius;
             ent.lerpSpeed = 0f;
             sphere?.Spawn();
-
+            return sphere;
 
         }
 
@@ -230,21 +305,21 @@ namespace Oxide.Plugins
         {
             "Construction Trigger", "Construction"
         });
-        
+
         static int collisionLayer = LayerMask.GetMask("Construction", "Construction Trigger",
             "Trigger", "Deployed", "Default");
 
         // TODO maybe find the nearest collider?
         public static T FindComponentNearestToLocation<T>(Vector3 location, int radius)
         {
-            T component = default(T); 
+            T component = default(T);
 
-           // IemUtils.DDLog("in search at location " + location);
+            // IemUtils.DDLog("in search at location " + location);
 
-            float dist = 9999; 
+            float dist = 9999;
             foreach (Collider col in Physics.OverlapSphere(location, radius))
             {
-               // IemUtils.DDLog("collider " + col.name);
+                // IemUtils.DDLog("collider " + col.name);
                 if (col.GetComponentInParent<T>() == null) continue;
 
                 //IemUtils.DDLog("not null collider " + col.GetComponentInParent<T>().ToString());
@@ -265,7 +340,7 @@ namespace Oxide.Plugins
                     dist = tempdist;
                     component = col.GetComponentInParent<T>();
                 }
-                
+
 
             }
             if (component != null)
@@ -340,28 +415,44 @@ namespace Oxide.Plugins
             return null;
         }
 
-       // public static GameObject FindObjectAtLocation(string prefab, Vector3 location)
-       // {
-            
-       // }
+        // public static GameObject FindObjectAtLocation(string prefab, Vector3 location)
+        // {
+
+        // }
+
+
+        //StorageContainer box = (StorageContainer)BaseNetworkable.serverEntities.Find(net.ID);
+        //StorageContainer box1 = BaseNetworkable.serverEntities.Find(net.ID).GetComponent<StorageContainer>();
 
         public static BaseEntity FindBaseEntityByNetId(uint netId)
         {
-
-            var foundentities = UnityEngine.Object.FindObjectsOfType<BaseEntity>();
-            foreach (var entity in foundentities)
+            var found = BaseNetworkable.serverEntities.Find(netId);
+            if (found != null)
             {
-                if (entity.net.ID == netId)
-                    return entity;
+                if (found.net != null)
+                {
+                    return (BaseEntity)found;
+                }
             }
+
+            //var foundentities = UnityEngine.Object.FindObjectsOfType<BaseEntity>();
+            //if (foundentities != null)
+            //{
+            //    foreach (var entity in foundentities)
+            //    {
+            //        if (entity.net != null)
+            //            if (entity.net.ID == netId)
+            //                return entity;
+            //    }
+            //}
             return null;
         }
 
-        private static readonly FieldInfo serverInputField 
-            = typeof(BasePlayer).GetField("serverInput", BindingFlags.Instance | 
+        private static readonly FieldInfo serverInputField
+            = typeof(BasePlayer).GetField("serverInput", BindingFlags.Instance |
                 BindingFlags.NonPublic);
-        private static readonly FieldInfo instancesField 
-            = typeof(MeshColliderBatch).GetField("instances", BindingFlags.Instance | 
+        private static readonly FieldInfo instancesField
+            = typeof(MeshColliderBatch).GetField("instances", BindingFlags.Instance |
                 BindingFlags.NonPublic);
 
         public static Stack<BuildingBlock> GetTargetBuildingBlock(BasePlayer player)
@@ -438,7 +529,7 @@ namespace Oxide.Plugins
             RaycastHit hitinfo;
             if (Physics.Raycast(position, Vector3Down, out hitinfo, 100f, groundLayer))
             {
-                var buf = hitinfo.point + Vector3.up + Vector3.up;
+                var buf = hitinfo.point;
                 DLog("returning in groundy: " + buf);
                 return buf;
             }
@@ -469,6 +560,7 @@ namespace Oxide.Plugins
 
         public static void TeleportPlayerPosition(BasePlayer player, Vector3 destination)
         {
+            me.teleporting.Add(player.userID);
             //DLog("teleporting player from " + player.transform.position.ToString());
             //DLog("teleporting player to   " + destination.ToString());
             destination = GetGroundY(destination);
@@ -479,10 +571,38 @@ namespace Oxide.Plugins
             player.SendNetworkUpdateImmediate(false);
             player.ClientRPCPlayer(null, player, "StartLoading", null, null, null, null, null);
             player.SendFullSnapshot();
+
+
+            me.teleporting.Remove(player.userID);
+        }
+
+        public static void Teleport(BasePlayer player, Vector3 position)
+        {
+            //SaveLocation(player);
+            me.teleporting.Add(player.userID);
+            if (player.net?.connection != null)
+                player.ClientRPCPlayer(null, player, "StartLoading", null, null, null, null, null);
+            //StartSleeping(player);
+            player.MovePosition(position);
+            if (player.net?.connection != null)
+                player.ClientRPCPlayer(null, player, "ForcePositionTo", position);
+            player.TransformChanged();
+            if (player.net?.connection != null)
+                player.SetPlayerFlag(BasePlayer.PlayerFlags.ReceivingSnapshot, true);
+            player.UpdateNetworkGroup();
+            //player.UpdatePlayerCollider(true, false);
+            player.SendNetworkUpdateImmediate(false);
+            if (player.net?.connection == null) return;
+            //TODO temporary for potential rust bug
+            try { player.ClearEntityQueue(null); } catch { }
+            player.SendFullSnapshot();
+
+            me.teleporting.Remove(player.userID);
         }
 
         public static void MovePlayerTo(BasePlayer player, Vector3 loc)
         {
+            me.teleporting.Add(player.userID);
             DLog("moving player " + player.UserIDString);
             if (player.inventory.loot.IsLooting())
             {
@@ -490,9 +610,13 @@ namespace Oxide.Plugins
             }
             player.CancelInvoke("InventoryUpdate");
             player.inventory.crafting.CancelAll(true);
+            IemUtils.DLog("loc " + loc);
             loc = GetGroundY(loc);
+            IemUtils.DLog("loc " + loc);
             rust.ForcePlayerPosition(player, loc.x, loc.y, loc.z);
             player.SendNetworkUpdateImmediate();
+
+            me.teleporting.Remove(player.userID);
         }
 
         //TODO implement this with SQr values?
@@ -748,25 +872,44 @@ namespace Oxide.Plugins
             IemUtils.State CurrentState { get; set; }
             DateTime StartedTime { get; set; }
             DateTime EndedTime { get; set; }
+            //TODO might need to populate this from the database
+            Guid GetGuid();
+
+            Dictionary<string, IemUtils.IIemPlayer> Players { get; set; }
+            //List<IIemPlayer> GetPlayers();
 
             //is static method
             //IemGame CreateGame(string gamename);
             bool CanStart();
             bool StartGame();
+            bool StartGame(BasePlayer player);
             bool EndGame();
             bool CancelGame();
             bool PauseGame();
             bool CleanUp();
         }
 
-        public interface IIemTeamGame
+        public interface IIemTeamGame : IIemGame
         {
 
             Dictionary<string, IemUtils.IIemTeam> Teams { get; set; }
-            Dictionary<string, IemUtils.IIemTeamPlayer> Players { get; set; }
             int MinTeams { get; set; }
             int MaxTeams { get; set; }
+            int MinPlayersPerTeam { get; set; }
+            int MaxPlayersPerTeam { get; set; }
             IemUtils.IIemTeam Winner();
+        }
+
+
+        public interface IIemPlayer
+        {
+            string PlayerId { get; set; }
+            string Name { get; set; }
+            int Score { get; set; }
+            PlayerState PlayerState { get; set; }
+
+            //TODO might need to populate this from the database
+            Guid GetGuid();
         }
 
         public enum PlayerState
@@ -775,14 +918,21 @@ namespace Oxide.Plugins
             Dead
         };
 
-        public interface IIemTeamPlayer
+        public interface IIemTeamPlayer : IIemPlayer
         {
-            string PlayerId { get; set; }
-            string Name { get; set; }
             IIemTeam Team { get; set; }
             IIemTeamGame TeamGame { get; set; }
-            int Score { get; set; }
-            PlayerState PlayerState { get; set; }
+            BasePlayer AsBasePlayer();
+        }
+
+        public enum TeamState
+        {
+            Before,
+            Empty,
+            Playing,
+            Lost,
+            Won
+
         }
 
         public interface IIemTeam
@@ -792,6 +942,10 @@ namespace Oxide.Plugins
             int MaxPlayers { get; set; }
             int MinPlayers { get; set; }
             int Score { get; set; }
+            TeamState State { get; set; }
+            string Color { get; set; }
+            //TODO might need to populate this from the database
+            Guid GetGuid();
 
             //is static method
             //IemGame CreateGame(string gamename);

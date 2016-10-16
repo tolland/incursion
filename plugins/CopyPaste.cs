@@ -41,10 +41,7 @@ namespace Oxide.Plugins
         // General Methods
         //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-        string GetMsg(string key, object steamid = null)
-        {
-            return lang.GetMessage(key, this, steamid == null ? null : steamid.ToString());
-        }
+        string GetMsg(string key, object steamid = null) { return lang.GetMessage(key, this, steamid == null ? null : steamid.ToString()); }
         bool hasAccess(BasePlayer player, string permissionName) { if (player.net.connection.authLevel > 1) return true; return permission.UserHasPermission(player.userID.ToString(), permissionName); }
 
         bool FindRayEntity(Vector3 sourcePos, Vector3 sourceDir, out Vector3 point, out BaseEntity entity)
@@ -493,7 +490,7 @@ namespace Oxide.Plugins
             return TryPasteFromPlayer(player, filename, args);
         }
 
-        object TryPasteFromPlayer(BasePlayer player, string filename, string[] args)
+        public object TryPasteFromPlayer(BasePlayer player, string filename, string[] args)
         {
             if (player == null) return "Player is null?";
             if (!player.IsConnected()) return "Player is not connected?";
@@ -509,7 +506,7 @@ namespace Oxide.Plugins
             return TryPaste(sourcePoint, filename, player, ViewAngles.ToEulerAngles().y, args);
         }
 
-        object TryPaste(Vector3 startPos, string filename, BasePlayer player, float RotationCorrection, string[] args)
+        public object TryPaste(Vector3 startPos, string filename, BasePlayer player, float RotationCorrection, string[] args)
         {
             var steamid = player == null ? null : player.userID.ToString();
 

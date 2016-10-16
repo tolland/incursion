@@ -236,9 +236,35 @@ namespace Oxide.Plugins
 
             foreach (KitItem kitem in kit.items)
             {
+                //Puts("restoring kit item " + kitem.container);
                 if (kitem.weapon)
-                    player.inventory.GiveItem(BuildWeapon(kitem.itemid, kitem.skinid, kitem.mods), kitem.container == "belt" ? player.inventory.containerBelt : kitem.container == "wear" ? player.inventory.containerWear : player.inventory.containerMain);
-                else player.inventory.GiveItem(BuildItem(kitem.itemid, kitem.amount, kitem.skinid), kitem.container == "belt" ? player.inventory.containerBelt : kitem.container == "wear" ? player.inventory.containerWear : player.inventory.containerMain);
+                {
+                    ItemContainer tempcontain = kitem.container == "belt"
+                        ? player.inventory.containerBelt
+                        : kitem.container == "wear"
+                            ? player.inventory.containerWear
+                            : player.inventory.containerMain;
+                    //Puts("tempcontainer is " + tempcontain.ToString());
+                    player.inventory.GiveItem(BuildWeapon(kitem.itemid, kitem.skinid, kitem.mods),
+                        tempcontain);
+                }
+                else
+                {
+
+                    ItemContainer tempcontain = kitem.container == "belt"
+                        ? player.inventory.containerBelt
+                        : kitem.container == "wear"
+                            ? player.inventory.containerWear
+                            : player.inventory.containerMain;
+                    //Puts("tempcontainer2 is " + tempcontain.ToString());
+
+                    player.inventory.GiveItem(BuildItem(kitem.itemid, kitem.amount, kitem.skinid),
+                        kitem.container == "belt"
+                            ? player.inventory.containerBelt
+                            : kitem.container == "wear"
+                                ? player.inventory.containerWear
+                                : player.inventory.containerMain);
+                }
 
             }
             if (kit.building != null && kit.building != string.Empty)
@@ -259,6 +285,8 @@ namespace Oxide.Plugins
         {
             if (amount < 1) amount = 1;
             Item item = ItemManager.CreateByItemID(itemid, amount, skin);
+            if (item == null) Puts("item was null here");
+            //Puts("item " + item.amount);
             return item;
         }
         private Item BuildWeapon(int id, int skin, List<int> mods)

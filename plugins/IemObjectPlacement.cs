@@ -108,58 +108,26 @@ namespace Oxide.Plugins
         {
             foreach (CreatedGameObject obj in storedData.Objects.Values)
             {
-                IemUtils.DDLog("looking for stored object: " + obj.netId);
-                BaseEntity be = IemUtils.FindBaseEntityByNetId(obj.netId);
+                //IemUtils.DDLog("looking for stored object: " + obj.netId);
+                BaseEntity be = null;
+                try
+                {
+                    be = IemUtils.FindBaseEntityByNetId(obj.netId);
+                }
+
+                catch (Exception e)
+                {
+                    Console.WriteLine("{0} Exception caught. obj.netId", e);
+                } 
+                
+
                 if (be != null)
                 {
-                    be.Kill(BaseNetworkable.DestroyMode.Gib);
+                   // IemUtils.DDLog("killing");
+                    be.Kill(BaseNetworkable.DestroyMode.None);
                     //be.KillMessage();  
-                } 
+                }  
 
-
-
-                //Deployable found = IemUtils.FindComponentNearestToLocation<Deployable>(
-                //    new Vector3(obj.x, obj.y, obj.z), 8);
-                ////var found = IemUtils.FindObjectByID(obj.instanceId);
-                //if (found != null)
-                //{
-                //    if (!found.isActiveAndEnabled)
-                //    {
-                //        IemUtils.DDLog("NOT ACTIVE AND ENABLED");
-                //    }
-
-
-                //    IemUtils.DDLog("found the object: " + found.prefabID);
-                //    if (found.name == obj.prefab)
-                //    {
-                //        IemUtils.DDLog("Deleting object with id ... " + obj.instanceId);
-
-                //        IemUtils.DDLog("name =" + found.gameObject.name);
-                //        found.gameObject.ToBaseEntity().Kill();
-
-                //        BaseEntity be = found.GetComponentInParent<BaseEntity>();
-                //        var realEntity = found.GetComponent<BaseNetworkable>().net;
-                //        IemUtils.DDLog("base entity at " + be.transform.position);
-
-                //        if (be != null)
-                //        {
-                //            //be.Kill(BaseNetworkable.DestroyMode.Gib);
-                //            //be.KillMessage();  
-                //        }
-                //        else
-                //            IemUtils.DDLog("no base entity");
-                //    }
-                //    else
-                //    {
-                //        IemUtils.DDLog("not matched prefab");
-                //        IemUtils.DDLog(obj.prefab);
-                //        IemUtils.DDLog(found.name);
-                //    }
-                //}
-                //else
-                //{
-                //    IemUtils.DDLog("not found");
-                //}
             }
             IemUtils.DDLog("clearing");
             storedData.Objects.Clear();
@@ -169,67 +137,52 @@ namespace Oxide.Plugins
 
         #endregion
 
-        //[Serializable]
-        //public class Tagg1
-        //{
-        //    public string tempstring;
-        //}
-
-        public class PartitionComponent : MonoBehaviour
-        {
-
-            //[SerializeField]
-            //public string tempstring;
-
-
-            //public Tagg1 obj;
-
-            void Awake()
-            {
-                //if (tempstring == null)
-                //{
-                //    IemUtils.DDLog("tempstring is null, resetting");
-                //    tempstring = DateTime.Now.ToString();
-                //}
-                //if (obj == null)
-                //{
-                //    IemUtils.DDLog("obj is null, resetting");
-                //    obj = new Tagg1();
-                //}
-            }
-
-            public static PartitionComponent GetPartitionComponent(GameObject go)
-            {
-                PartitionComponent partitionComponent
-                    = go.GetComponent<PartitionComponent>();
-
-                if (partitionComponent == null)
-                {
-                    //IemUtils.DDLog("creating partitionComponent from fresh");
-                    partitionComponent = go.gameObject.AddComponent<PartitionComponent>();
-                }
-
-                //IemUtils.DDLog("obj was: " + partitionComponent.tempstring);
-
-                return partitionComponent;
-            }
-        }
-
-
-        public static void List()
-        {
-
-            PartitionComponent[] partitionComponents = GameObject.FindObjectsOfType<PartitionComponent>();
-            foreach (PartitionComponent joint in partitionComponents)
-            {
-                IemUtils.DDLog("component found " + joint.name);
-
-            }
-        }
 
         public class CopyPastePlacement
         {
-            //List<BaseEntity> entities = new List<BaseEntity>();
+            List<uint> entities = new List<uint>();
+
+
+            public CopyPastePlacement(string pastename, Vector3 location)
+            {
+                // var success = iemObjectPlacement.CopyPaste.TryPlaceback(
+                //    pastename, null, new string[] { });
+               // var ViewAngles = Quaternion.Euler(player.GetNetworkRotation());
+                //string[] args = { "height", location.y.ToString() };
+                string[] args = {  };
+                var success = iemObjectPlacement.CopyPaste.TryPaste(
+                    location, pastename, null, 0, args);
+
+
+                if (success is List<BaseEntity>)
+                {
+                    List<BaseEntity> mysuccess = (List<BaseEntity>)success;
+
+                    foreach (BaseEntity baseEntity in mysuccess)
+                    {
+                        
+                        GameObject go = baseEntity.gameObject;
+
+                        if (baseEntity.net != null)
+                            entities.Add(baseEntity.net.ID);
+
+                        if (storedData != null)
+                        {
+                            if (storedData.Objects != null)
+                            {
+                                //Plugins.IemUtils.DLog("net is " + baseEntity.net.ID);
+                                storedData.Objects.Add(baseEntity.net.ID,
+                                    new CreatedGameObject(
+                                        baseEntity
+                                    ));
+                            }
+                        }
+
+                    }
+                }
+                SaveData();
+            }
+
 
             public CopyPastePlacement(string pastename)
             {
@@ -241,21 +194,12 @@ namespace Oxide.Plugins
 
                     foreach (BaseEntity baseEntity in mysuccess)
                     {
-                        PartitionComponent.GetPartitionComponent(baseEntity.gameObject);
-                        //IemUtils.DLog("id is " + baseEntity.gameObject.GetInstanceID());
-                        //IemUtils.DLog("name is " + baseEntity.gameObject.name);
-                        //IemUtils.DLog("type is " + baseEntity.gameObject.GetType());
-                        //IemUtils.DLog("type is " + baseEntity.gameObject.);
-                        //IemUtils.DLog("hash is " + baseEntity.gameObject.GetHashCode());
+
                         GameObject go = baseEntity.gameObject;
-                        //go.GetComponents()
 
-                        //IemUtils.DDLog("net id is " + baseEntity.net.ID);
 
-                        //Component[] hingeJoints = go.GetComponents(typeof(Component));
-
-                        //foreach (Component joint in hingeJoints)
-                        //    IemUtils.DLog("component is " + joint.ToString());
+                        if (baseEntity.net != null)
+                            entities.Add(baseEntity.net.ID);
 
                         if (storedData != null)
                         {
@@ -266,15 +210,7 @@ namespace Oxide.Plugins
                                     new CreatedGameObject(
                                         baseEntity
                                     ));
-                            } 
-                            else
-                            {
-                                IemUtils.DDLog("stored data objects was null");
                             }
-                        }
-                        else
-                        {
-                            IemUtils.DDLog("stored data was null");
                         }
 
                     }
@@ -285,33 +221,41 @@ namespace Oxide.Plugins
             public void Remove()
             {
 
-                PartitionComponent[] partitionComponents = GameObject.FindObjectsOfType<PartitionComponent>();
-                foreach (PartitionComponent partitionComponent in partitionComponents)
+                
+                foreach (var netid in entities)
                 {
                     //IemUtils.DDLog("component found " + joint.name);
-                    BaseEntity be = partitionComponent.gameObject.GetComponent<BaseEntity>();
-                    if (be != null)
+                    BaseEntity be = null;
+
+                    try
                     {
-                        if (be.net != null)
+                        be = IemUtils.FindBaseEntityByNetId(netid);
+                        if (be != null)
                         {
-                            uint tempuint = be.net.ID;
+                            if (be.net != null)
+                            {
+                                uint tempuint = be.net.ID;
 
-                            be.Kill(BaseNetworkable.DestroyMode.Gib);
+                                be.Kill(BaseNetworkable.DestroyMode.Gib);
 
-                            if (storedData.Objects.ContainsKey(tempuint))
-                                storedData.Objects.Remove(tempuint);
+                                if (storedData.Objects.ContainsKey(tempuint))
+                                    storedData.Objects.Remove(tempuint);
+                            }
+                            else
+                            {
+                                IemUtils.DDLog("be was null");
+                            }
                         }
                         else
                         {
-                            IemUtils.DDLog("be was null");
+                            IemUtils.DDLog("be net was null");
                         }
                     }
-                    else
+
+                    catch (Exception e)
                     {
-                        IemUtils.DDLog("be net was null");
+                        Console.WriteLine("{0} Exception caught. obj.netId", e);
                     }
-
-
                 }
                 SaveData();
             }
