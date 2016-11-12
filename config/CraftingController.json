@@ -1,0 +1,32 @@
+{
+  "Messages": {
+    "BlockedItem": "{0} has already been blocked!",
+    "BlockSucces": "{0} has been blocked from crafting.",
+    "CraftBlockedItem": "{0} is blocked and can not be crafted!",
+    "CurrentCraftingRate": "The crafting rate is set to {0}%.",
+    "InvalidItem": "{0} is not a valid item. Please use the name of the item as it appears in the item list. Ex: Camp Fire",
+    "ModifyCraftingRate": "The crafting rate is now set to {0}%.",
+    "ModifyCraftingRateError": "The new crafting rate must be a number. 0 is instant craft, 100 is normal and 200 is double!",
+    "ModifyCraftingRateItem": "The crafting rate for {0} is now set to {1}%.",
+    "NoBlockedItems": "No items have been blocked.",
+    "NoItemRate": "You need to specify an item and a new crafting rate for this command.",
+    "NoItemSpecified": "You need to specify an item for this command.",
+    "NoPermission": "You don't have permission to use this command.",
+    "ShowBlockedItems": "The following items are blocked: ",
+    "UnblockItem": "{0} is not blocked!",
+    "UnblockSucces": "{0} is no longer blocked from crafting."
+  },
+  "Options": {
+    "BlockedItems": [],
+    "CompleteCurrentCraftingOnShutdown": false,
+    "CraftingExperienceRate": 100.0,
+    "CraftingRate": 30.0,
+    "IndividualCraftingRates": {},
+    "InstantCraftForAdmins": true,
+    "InstantCraftForModerators": false
+  },
+  "Settings": {
+    "ChatPrefix": "Crafting Controller",
+    "ChatPrefixColor": "#008000ff"
+  }
+}
