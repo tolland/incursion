@@ -1,5 +1,4 @@
-﻿//Requires: CopyPaste
-//Requires: IemUtils
+﻿//Requires: IemUtils
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -11,17 +10,19 @@ using UnityEngine;
 
 namespace Oxide.Plugins
 {
-
+     
     public class IemObjectPlacement : RustPlugin
     {
         [PluginReference]
-        CopyPaste CopyPaste;
+        Plugin CopyPaste;
 
+        //[PluginReference] Plugin 
+        //[PluginReference]
 
-        [PluginReference]
         IemUtils IemUtils;
 
         static IemObjectPlacement iemObjectPlacement = null;
+        static IemObjectPlacement me = null;
 
 
         #region boiler plate
@@ -29,6 +30,7 @@ namespace Oxide.Plugins
         void Init()
         {
             iemObjectPlacement = this;
+            me = this;
         }
 
         void Loaded()
@@ -150,8 +152,22 @@ namespace Oxide.Plugins
                // var ViewAngles = Quaternion.Euler(player.GetNetworkRotation());
                 //string[] args = { "height", location.y.ToString() };
                 string[] args = {  };
-                var success = iemObjectPlacement.CopyPaste.TryPaste(
-                    location, pastename, null, 0, args);
+              //  var success = iemObjectPlacement.CopyPaste.TryPaste(
+                //    location, pastename, null, 0, args);
+
+                var success = me.CopyPaste.Call("TryPaste", location, pastename, null, 0, args);
+
+                //            iemUtils.ZoneManager.Call("CreateOrUpdateZone",
+                //"zone_" + name,
+                //new string[]
+                //{
+                //    "radius", radius.ToString(),
+                //    "autolights", "true",
+                //    "eject", "false",
+                //    "enter_message", "",
+                //    "leave_message", "",
+                //    "killsleepers", "true"
+                //}, location);
 
 
                 if (success is List<BaseEntity>)
@@ -179,6 +195,10 @@ namespace Oxide.Plugins
                         }
 
                     }
+                }else
+                {
+                    me.Puts("erere");
+                   me.Puts("success is " + success.ToString());
                 }
                 SaveData();
             }
@@ -186,8 +206,13 @@ namespace Oxide.Plugins
 
             public CopyPastePlacement(string pastename)
             {
-                var success = iemObjectPlacement.CopyPaste.TryPlaceback(
-                    pastename, null, new string[] { });
+              //  var success = iemObjectPlacement.CopyPaste.TryPlaceback(
+                //    pastename, null, new string[] { });
+
+
+
+                var success = me.CopyPaste.Call("TryPlaceback", pastename, null, new string[] { });
+
                 if (success is List<BaseEntity>)
                 {
                     List<BaseEntity> mysuccess = (List<BaseEntity>)success;
@@ -236,7 +261,7 @@ namespace Oxide.Plugins
                             {
                                 uint tempuint = be.net.ID;
 
-                                be.Kill(BaseNetworkable.DestroyMode.Gib);
+                                be.Kill(BaseNetworkable.DestroyMode.None);
 
                                 if (storedData.Objects.ContainsKey(tempuint))
                                     storedData.Objects.Remove(tempuint);

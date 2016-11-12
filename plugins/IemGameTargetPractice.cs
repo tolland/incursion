@@ -5,6 +5,7 @@
 using System;
 using System.Collections.Generic;
 using System.Text;
+using System.Reflection;
 using Oxide.Core.Plugins;
 using Oxide.Game.Rust.Cui;
 using Rust;
@@ -28,21 +29,16 @@ namespace Oxide.Plugins
         Plugin Kits;
 
         [PluginReference]
-        Plugin ScreenTimer;
-
-        [PluginReference]
         IemObjectPlacement IemObjectPlacement;
 
         [PluginReference]
         IemGameBase IemGameBase;
 
         static IemGameTargetPractice me;
+        private static FieldInfo knockdownHealth;
 
         static TPGameManager gm;
         static Dictionary<string, IemGameTargetPracticeGame> games = new Dictionary<string, IemGameTargetPracticeGame>();
-
-        int multiplier = 100;
-        int multicount = 1;
 
         #endregion
 
@@ -71,9 +67,10 @@ namespace Oxide.Plugins
             //IemUtils.LogL("IemGameTargetPractice: unloaded complete");
         }
 
-
         void OnServerInitialized()
         {
+
+            knockdownHealth = typeof(ReactiveTarget).GetField("knockdownHealth", (BindingFlags.Public | BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic));
             //IemUtils.LogL("IemGameTargetPractice: OnServerInitialized started");
             //IemUtils.LogL("IemGameTargetPractice: OnServerInitialized complete");
         }
@@ -104,32 +101,14 @@ namespace Oxide.Plugins
                 TileImgUrl = "http://www.limepepper.co.uk/images/PNG_Example.png";
             }
 
-            public override IemGameBase.IemGame SendPlayerToGameManager(BasePlayer player)
+
+            public override IemGameBase.IemGame CreateGame(BasePlayer player)
             {
-                foreach(var mygame in games)
-                {
-                    me.Puts("game is " + mygame.Value.Name);
-                    me.Puts("- state is " + mygame.Value.CurrentState);
-                }
-                if (games.ContainsKey(player.UserIDString)) 
-                {
-                    me.Puts("in the tp game manager, found existing game for player");
-                    if (games[player.UserIDString].CurrentState == IemUtils.State.Complete ||
-                        games[player.UserIDString].CurrentState == IemUtils.State.Cancelled)
-                    {
-                        var newGame = new IemGameTargetPracticeGame(player);
-                        games[player.UserIDString] = newGame;
-                    }
-                } 
-                else
-                {
-                    me.Puts("in the tp game manager, creating new game");
-                    var newGame = new IemGameTargetPracticeGame(player);
-                    games[player.UserIDString] = newGame;
-                    games[player.UserIDString].StartGame();
-                }
-                
-                return games[player.UserIDString];
+                me.Puts("in the tp game manager, creating new game");
+                var newGame = new IemGameTargetPracticeGame(player);
+                newGame.StartGame();
+                return newGame;
+
             }
         }
 
@@ -140,9 +119,20 @@ namespace Oxide.Plugins
         public class
         IemTargetPracticePlayer : IemGameBase.IemPlayer
         {
-            public IemTargetPracticePlayer(BasePlayer player) : base(player)
+            public IemTargetPracticePlayer(BasePlayer player,
+                IemGameBase.IemSoloGame game) : base(player)
             {
+
+                me.IemUtils?.SaveInventory(player, game.GetGuid());
             }
+        }
+
+        public class GameLevel
+        {
+            public int Targets { get; set; }
+            public int Timer { get; set; }
+            public bool Started = false;
+
         }
 
         public class IemGameTargetPracticeGame : IemGameBase.IemSoloGame
@@ -150,21 +140,37 @@ namespace Oxide.Plugins
             public TargetPracticeStateManager gsm;
             public float GameLobbyWait = 12;
             public int MainPhaseWait = 20;
-            public BasePlayer player;
-            public IemGameBase.IemPlayer iemPlayer;
 
-            public IemGameTargetPracticeGame(BasePlayer newPlayer)
+            public List<GameLevel> gamelevels = new List<GameLevel>(new GameLevel[] {
+                new GameLevel {Targets=5, Timer=20},
+                new GameLevel {Targets=7, Timer=20},
+                new GameLevel {Targets=7, Timer=18},
+                new GameLevel {Targets=9, Timer=17},
+                new GameLevel {Targets=9, Timer=18},
+                new GameLevel {Targets=11, Timer=18},
+                new GameLevel {Targets=11, Timer=18},
+                new GameLevel {Targets=12, Timer=17}
+            });
+
+            public int level = 0;
+
+            // find reactive targets within 50 units of the game location
+            // TODO this presumes that the game is a skygame
+           public  List<ReactiveTarget> targets = new List<ReactiveTarget>();
+
+
+            public IemGameTargetPracticeGame(BasePlayer newPlayer) : base(newPlayer)
             {
-                player = newPlayer;
                 Name = "Target_Practice";
                 OnlyOneAtATime = true;
-                Mode = "Team";
+                Mode = "Solo";
                 gsm = new TargetPracticeStateManager(
                     TargetPracticeStateManager.Created.Instance, this);
 
                 var newIemPlayer =
-                    new IemTargetPracticePlayer(player);
+                    new IemTargetPracticePlayer(player, this);
                 this.Players.Add(player.UserIDString, newIemPlayer);
+
                 iemPlayer = newIemPlayer;
             }
 
@@ -185,23 +191,9 @@ namespace Oxide.Plugins
                 return true;
             }
 
-            public override bool EndGame()
-            {
-                IemUtils.GLog("calling EndGame in IemGameTargetPracticeGame");
-
-                base.EndGame();
-                return true;
-            }
-
             public override bool CancelGame()
             {
-
-                IemUtils.DDLog("listing in CancelGame");
-                //((IemGameTargetPracticeGame)game).gsm.partition?.List();
-
-                IemUtils.GLog("calling CancelGame in IemGameTargetPracticeGame");
                 gsm?.ChangeState(TargetPracticeStateManager.GameCancelled.Instance);
-
                 base.CancelGame();
                 return true;
             }
@@ -219,15 +211,93 @@ namespace Oxide.Plugins
                 {
                     IemUtils.SetMetabolismValues(player);
                     player.SetPlayerFlag(BasePlayer.PlayerFlags.Wounded, false);
-                    player.CancelInvoke("WoundingEnd");
+                    player.CancelInvoke("WoundingTick");
                 }
 
                 if (!IemUtils.CheckPointNearToLocation(player.transform.position, location, 2))
                     //IemUtils.MovePlayerTo(player, location);
-                    IemUtils.TeleportPlayerPosition(player, location); 
+                    IemUtils.TeleportPlayerPosition(player, location);
 
                 return true;
             }
+
+            private float GetPlayerDistance(Vector3 targetPos, Vector3 attackerPos)
+            {
+                var distance = Vector3.Distance(targetPos, attackerPos);
+                var rounded = Mathf.Round(distance * 100f) / 100f;
+                return rounded;
+            }
+
+            public bool CheckLevelComplete()
+            {
+                GameLevel gamelevel = gamelevels[level];
+                if (iemPlayer.Score >= gamelevel.Targets)
+                {
+                    return true;
+                }
+                else
+                {
+                    //IemUI.CreateFadeoutBanner(player, "");
+                }
+
+                return false;
+
+            }
+
+            public void GoNextLevel()
+            {
+                leveltimer.Destroy();
+                level++;
+                IemUI.CreateFadeoutBanner(player, "level complete");
+
+                if (level >= gamelevels.Count)
+                {
+                    gsm?.ChangeState(TargetPracticeStateManager.GameComplete.Instance);
+                }
+                else
+                {
+                    gsm?.ChangeState(TargetPracticeStateManager.GameRunning.Instance);
+                }
+            }
+
+            private Timer leveltimer;
+
+            void wasCancelled()
+            {
+                me.Puts("was cancelled");
+                IemUI.CreateFadeoutBanner(player, "cancelling");
+                gsm?.ChangeState(TargetPracticeStateManager.GameComplete.Instance);
+            }
+
+            void wasConfirmed()
+            {
+                IemUI.CreateFadeoutBanner(player, "playing level again");
+                gsm?.ChangeState(TargetPracticeStateManager.GameRunning.Instance);
+            }
+
+            public void StartLevelTimer()
+            {
+
+                GameLevel gamelevel = gamelevels[level];
+
+                if (!gamelevel.Started)
+                {
+                    gamelevel.Started = true;
+                    IemUI.ShowGameTimer(player, gamelevel.Timer);
+
+                    leveltimer = me.timer.Once(gamelevel.Timer, () =>
+                    {
+                        if (!CheckLevelComplete())
+                        {
+
+                            IemUI.ConfirmCancel(player, "Level was not completed!\nYou can play this level again, or return to the map", "Again?", "Quit",
+                      wasConfirmed, wasCancelled);
+
+                        }
+                    });
+                }
+            }
+
 
             public void ScorePlayerHit(BaseCombatEntity entity, HitInfo hitinfo)
             {
@@ -237,22 +307,52 @@ namespace Oxide.Plugins
                     {
 
                         var target = (ReactiveTarget)entity;
-                        var attacker = (BasePlayer)hitinfo.Initiator;
-                        if (entity != null && attacker != null)
+
+                        if (!targets.Contains(target))
                         {
-                            if (hitinfo.HitBone == StringPool.Get("target_collider_bullseye"))
+                            me.Puts("is not game target");
+                            return;
+                        }
+
+                        var attacker = (BasePlayer)hitinfo.Initiator;
+                        if (attacker.UserIDString != iemPlayer.AsBasePlayer().UserIDString) {
+                            me.Puts("is not game player");
+                            return;
+                        }
+                            
+
+                        if (entity == null || attacker == null)
+                            return;
+
+                        // hits on reactive targets tigger OnEntityTakeDamage twice
+                        // this selects for the one created by on shared hit in ReactiveTarget
+                        if (hitinfo.damageTypes.Total() != 1f)
+                            return;
+
+                        if (hitinfo.HitBone == StringPool.Get("target_collider_bullseye"))
+                        {
+                            IemUtils.DrawChatMessage(attacker, target, "Bullseye!!!!");
+                        }
+
+                        var health = knockdownHealth.GetValue(target);
+
+                        StartLevelTimer();
+
+                        if (target.IsKnockedDown())
+                        {
+                            iemPlayer.Score += 1;
+                            IemUI.CreateGameBanner2(attacker, "score=" + iemPlayer.Score);
+
+                            if (CheckLevelComplete())
                             {
+                                GoNextLevel();
                             }
-                            if (target.IsKnockedDown())
+                            else
                             {
                                 target.CancelInvoke("ResetTarget");
                                 target.health = target.MaxHealth();
                                 target.SendNetworkUpdate();
-                                me.timer.Once(1, () => target.SetFlag(BaseEntity.Flags.On, true));
-
-                                //eventPlayer.Score += 1;
-                                IemUtils.GLog("scoring knockdown");
-                                iemPlayer.Score += 1;
+                                // me.timer.Once(1, () => target.SetFlag(BaseEntity.Flags.On, true));
                             }
                         }
                     }
@@ -287,6 +387,9 @@ namespace Oxide.Plugins
             public IemObjectPlacement.CopyPastePlacement partition;
             private IemGameTargetPracticeGame eg;
 
+
+            Vector3 location = me.IemUtils.NextFreeLocation();
+
             public TargetPracticeStateManager(IemStateManager.IStateMachine initialState,
                 IemGameTargetPracticeGame newEg) : base(initialState)
             {
@@ -303,35 +406,37 @@ namespace Oxide.Plugins
                 {
                     TargetPracticeStateManager gsm = (TargetPracticeStateManager)sm;
 
-                    me.multicount += 1;
                     gsm.partition = new IemObjectPlacement.CopyPastePlacement(
-                        "shootinggallery1", new Vector3(-120 + (me.multicount * me.multiplier),
-                        136, 266 + (me.multicount * me.multiplier)));
+                        "shootinggallery3", gsm.location);
 
-                    IemUtils.GLog("partition2_1500_7777_3123 " + gsm.partition);
+
+
                 }
             }
 
-            /// <summary> 
-            /// transitioning to this state is where players are moved to the field
-            /// game has not yet started. A pre game message can be shown
-            /// inventories can be reset
-            /// however something must be done to prevent players attacking and building etc
-            /// </summary>
-            public class GameLobby : IemStateManager.StateBase<GameLobby>, 
+            void proceedAction()
+            {
+                me.Kits?.Call("GiveKit", eg.player, "tp_v1");
+                eg.player.inventory.SendSnapshot();
+                ChangeState(TargetPracticeStateManager.GameRunning.Instance);
+
+            }
+
+            public class GameLobby : IemStateManager.StateBase<GameLobby>,
                 IemStateManager.IStateMachine
             {
                 public new void Enter(IemStateManager.StateManager sm)
                 {
                     TargetPracticeStateManager gsm = (TargetPracticeStateManager)sm;
+                    
+                    gsm.eg.targets = IemUtils.FindComponentsNearToLocation<ReactiveTarget>(gsm.location, 50);
 
-                    IemUtils.DLog("in the game lobby");
+                    gsm.eg.player.inventory.Strip();
 
                     EntitiesTakingDamage += gsm.eg.PlayerImmortal;
 
                     gsm.eg.MovePlayerToTeamLocation(gsm.eg.player,
-                        new Vector3(-120 + (me.multicount * me.multiplier), 136, 266 + (me.multicount * me.multiplier)));
-
+                        gsm.location);
 
                     gsm.eg.player.EndSleeping();
 
@@ -339,20 +444,18 @@ namespace Oxide.Plugins
                     IemUtils.ClearInventory(gsm.eg.player);
 
                     IemUI.CreateGameBanner(gsm.eg.player, "GAME LOBBY");
-                    IemUI.ShowIntroOverlay(gsm.eg.player,
-                        $"Weclome to target practice\n" +
-                        $"Shoot as many targets as possible.\n");
+                    //IemUI.ShowIntroOverlay(gsm.eg.player,
+                    //    $"Weclome to target practice\n" +
+                    //    $"Shoot as many targets as possible.\n" +
+                    //    $"each level timer will start when you fire the first shot");
 
                     IemUtils.PlaySound(gsm.eg.player);
 
+                    IemUI.Confirm(gsm.eg.player, $"Weclome to target practice\n" +
+                        $"Knock down the targets to proceed to the next level.\n" +
+                        $"each level timer will start when you fire the first shot", "Start Shootin'",
+                        gsm.proceedAction);
 
-                    IemUI.ShowGameTimer(gsm.eg.player, gsm.eg.GameLobbyWait - 3, "starting in: ");
-
-                    gsm.walltimer = me.timer.Once(gsm.eg.GameLobbyWait - 3, () =>
-                    {
-                        CuiHelper.DestroyUi(gsm.eg.player, "ShowIntroOverlay");
-                        gsm?.ChangeState(TargetPracticeStateManager.GameRunning.Instance);
-                    });
                 }
 
                 public new void Exit(IemStateManager.StateManager sm)
@@ -360,10 +463,37 @@ namespace Oxide.Plugins
                     TargetPracticeStateManager gsm = (TargetPracticeStateManager)sm;
                     gsm.walltimer?.Destroy();
                     EntitiesTakingDamage -= gsm.eg.PlayerImmortal;
+                    CuiHelper.DestroyUi(gsm.eg.player, "ShowIntroOverlay");
+
 
                 }
             }
 
+            private float GetPlayerDistance(Vector3 targetPos, Vector3 attackerPos)
+            {
+                var distance = Vector3.Distance(targetPos, attackerPos);
+                var rounded = Mathf.Round(distance * 100f) / 100f;
+                return rounded;
+            }
+
+
+
+            void DrawChatMessage(BasePlayer onlinePlayer, BaseEntity entity, string message)
+            {
+                float distanceBetween = Vector3.Distance(entity.transform.position, onlinePlayer.transform.position);
+
+
+
+                if (distanceBetween <= 50)
+                {
+
+                    string lastMessage = message;
+                    Color messageColor = new Color(1, 1, 1, 1);
+
+                    onlinePlayer.SendConsoleCommand("ddraw.text", 2f, messageColor, entity.transform.position + new Vector3(0, 1.9f, 0), "<size=25>" + lastMessage + "</size>");
+
+                }
+            }
             public class GameRunning : IemStateManager.StateBase<GameRunning>,
                 IemStateManager.IStateMachine
             {
@@ -371,38 +501,44 @@ namespace Oxide.Plugins
                 {
                     TargetPracticeStateManager gsm = (TargetPracticeStateManager)sm;
 
-                    // this only needs to be set once for the plugin
-                    //me.Subscribe(nameof(OnEntityTakeDamage));
+                    // reset the player score for this level
+                    gsm.eg.iemPlayer.Score = 0;
+
+                    // get the properties of this game level
+                    GameLevel gamelevel = gsm.eg.gamelevels[gsm.eg.level];
 
                     // log the score
                     EntitiesTakingDamage += gsm.eg.ScorePlayerHit;
 
-                    me.Kits?.Call("GiveKit", gsm.eg.player, "autokit");
-                    gsm.eg.player.inventory.SendSnapshot();
-                    IemUtils.PlaySound(gsm.eg.player);
-                    IemUI.CreateGameBanner(gsm.eg.player, "Game is running!");
-                    IemUtils.DLog("game is running");
+                    // refill magazines in weapons on belt container
+                    IemUtils.RefillBeltMagazines(gsm.eg.player);
 
-                    IemUI.ShowGameTimer(gsm.eg.player, gsm.eg.MainPhaseWait - 3);
-                    gsm.walltimer = me.timer.Once(gsm.eg.MainPhaseWait - 3, () =>
+                    foreach (var target in gsm.eg.targets)
                     {
-                        //    CuiHelper.DestroyUi(gsm.eg.player, "ShowIntroOverlay");
-                        gsm?.ChangeState(TargetPracticeStateManager.GameComplete.Instance);
-                    });
+                        target.ResetTarget();
+                        var health = knockdownHealth.GetValue(target);
+                        knockdownHealth.SetValue(target, 100f);
+                    }
+
+
+                    IemUtils.PlaySound(gsm.eg.player);
+                    IemUI.CreateGameBanner(gsm.eg.player, "Game is running! level " + (gsm.eg.level + 1));
+
                 }
 
                 public new void Exit(IemStateManager.StateManager sm)
                 {
                     TargetPracticeStateManager gsm = (TargetPracticeStateManager)sm;
                     gsm.walltimer?.Destroy();
+                    IemUI.CreateGameBanner(gsm.eg.player, "");
                     EntitiesTakingDamage -= gsm.eg.PlayerImmortal;
                     EntitiesTakingDamage -= gsm.eg.ScorePlayerHit;
+
+                    CuiHelper.DestroyUi(gsm.eg.player, "CreateFadeoutBanner");
+
                 }
             }
 
-            /// <summary>
-            /// GameComplete is effectively a post game lobby for the players
-            /// </summary>
             public class GameComplete : IemStateManager.StateBase<GameComplete>,
                 IemStateManager.IStateMachine
             {
@@ -410,28 +546,42 @@ namespace Oxide.Plugins
                 public new void Enter(IemStateManager.StateManager sm)
                 {
                     TargetPracticeStateManager gsm = (TargetPracticeStateManager)sm;
+
+                    List<ReactiveTarget> targets = IemUtils.FindComponentsNearToLocation<ReactiveTarget>(gsm.location, 50);
+                    foreach (var target in targets)
+                    {
+                        //var pos = target.transform.position;
+                        //var rot = target.transform.rotation;
+                        target.SetFlag(BaseEntity.Flags.On, false);
+
+                    }
+
                     // resultsTimer = IemUI.ShowResultsUiForSolo(gsm.eg.Players.Select(d => d.Value).ToList(), gsm.eg, 8);
                     IemUI.CreateGameBanner(gsm.eg.player, "Game is complete! - score was "
                         + gsm.eg.iemPlayer.Score);
+
+                    gsm.eg.EndGame();
+
 
 
                     IemUI.ShowGameTimer(gsm.eg.player, 10f, "back to map in: ");
 
                     gsm.walltimer = me.timer.Once(10f, () =>
                     {
-                        IemUtils.GLog("calling game complete on the event manager");
-                        gsm.eg.EndGame();
-                        gsm.eg.MovePlayerToTeamLocation(gsm.eg.player,
-                            gsm.eg.iemPlayer.previousLocation);
-                        gsm.partition.Remove();
-                        
-
+                        gsm?.ChangeState(TargetPracticeStateManager.CleanUp.Instance);
                     });
                 }
 
                 public new void Exit(IemStateManager.StateManager sm)
                 {
                     TargetPracticeStateManager gsm = (TargetPracticeStateManager)sm;
+
+                    foreach (IemGameBase.IemPlayer iemPlayer in gsm.eg.Players.Values)
+                    {
+                        BasePlayer player = IemUtils.FindPlayerByID(iemPlayer.PlayerId);
+                        IemUI.CreateGameBanner(player, "");
+                    }
+
                 }
             }
 
@@ -447,6 +597,22 @@ namespace Oxide.Plugins
                 }
             }
 
+
+
+            public class CleanUp : IemStateManager.StateBase<CleanUp>,
+                IemStateManager.IStateMachine
+            {
+                public new void Enter(IemStateManager.StateManager sm)
+                {
+                    TargetPracticeStateManager gsm = (TargetPracticeStateManager)sm;
+
+                    gsm.partition.Remove();
+                    gsm.eg.MovePlayerToTeamLocation(gsm.eg.player,
+                        gsm.eg.iemPlayer.PreviousLocation);
+                    me.IemUtils.RestoreInventory(gsm.eg.player, gsm.eg.GetGuid());
+                    me.Unsubscribe(nameof(OnRunPlayerMetabolism));
+                }
+            }
         }
 
         #endregion
@@ -485,6 +651,7 @@ namespace Oxide.Plugins
 
         private void OnEntityTakeDamage(BaseCombatEntity entity, HitInfo hitInfo)
         {
+
             EntitiesTakingDamage(entity, hitInfo);
         }
 

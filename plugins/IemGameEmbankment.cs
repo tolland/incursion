@@ -15,8 +15,8 @@ using UnityEngine;
 namespace Oxide.Plugins
 {
     [Info("Incursion Embankment", "tolland", "0.1.0")]
-    class IemGameEmbankment : RustPlugin 
-    {
+    class IemGameEmbankment : RustPlugin
+    { 
 
         #region header
 
@@ -30,9 +30,6 @@ namespace Oxide.Plugins
         Plugin Kits;
 
         [PluginReference]
-        Plugin ScreenTimer;
-
-        [PluginReference]
         IemObjectPlacement IemObjectPlacement;
 
         [PluginReference]
@@ -44,11 +41,6 @@ namespace Oxide.Plugins
         static IemGameEmbankment me;
         static EMGameManager gm;
         public static IemUtils.IIemGame game;
-
-        //static Dictionary<string, IemGameEmbankmentGame> games
-        //    = new Dictionary<string, IemGameEmbankmentGame>();
-        static List<IemGameEmbankmentGame> games
-            = new List<IemGameEmbankmentGame>();
 
         #endregion
 
@@ -68,7 +60,7 @@ namespace Oxide.Plugins
             IemGameBase.RegisterGameManager(gm);
             IemUtils.LogL("IemGameEmbankment: Loaded complete");
             IemUtils.LogL(" ");
-        } 
+        }
 
         void Unload()
         {
@@ -76,15 +68,13 @@ namespace Oxide.Plugins
             IemUtils.LogL("IemGameEmbankment: unloaded started");
             IemGameBase.UnregisterGameManager(gm);
             IemUtils.LogL("IemGameEmbankment: unloaded complete");
-        } 
+        }
 
 
         void OnServerInitialized()
         {
-           // IemUtils.LogL("IemGameEmbankment: OnServerInitialized started");
-
-
-           // IemUtils.LogL("IemGameEmbankment: OnServerInitialized complete");
+            // IemUtils.LogL("IemGameEmbankment: OnServerInitialized started");
+            // IemUtils.LogL("IemGameEmbankment: OnServerInitialized complete");
         }
 
         void LoadDefaultConfig()
@@ -99,48 +89,11 @@ namespace Oxide.Plugins
             IemUtils.GLog("Hook called to indicate game ended");
         }
 
-        void InitGame(IemGameBase.IemTeamGame teamgame)
-        {
-
-            IemGameBase.IemTeam team1 = teamgame.AddTeam(
-                new IemGameBase.IemTeam("team_1", "blue", 1, 20, "Blue Bandits"));
-
-            team1.Location = new Vector3(90, 23, 129);
-
-            IemGameBase.IemTeam team2 = teamgame.AddTeam(
-                new IemGameBase.IemTeam("team_2", "red", 1, 20, "Red Devils"));
-            team2.Location = new Vector3(120, 24, 96);
-        }  
-         
-        void NextPhase()
-        {
-            if (game != null)
-            {
-                if (game.CurrentState == IemUtils.State.Running)
-                {
-                    IemGameEmbankmentGame teamgame = (IemGameEmbankmentGame)game;
-                    if (teamgame.gsm.IsAny(EmbankStateManager.PartitionedPeriod.Instance))
-                    {
-                        teamgame.gsm.ChangeState(EmbankStateManager.MainPhase.Instance);
-                    }
-                    else if (teamgame.gsm.IsAny(EmbankStateManager.MainPhase.Instance))
-                    {
-                        teamgame.gsm.ChangeState(EmbankStateManager.SuddenDeath.Instance);
-                    }
-                    else if (teamgame.gsm.IsAny(EmbankStateManager.SuddenDeath.Instance))
-                    {
-                        teamgame.gsm.ChangeState(EmbankStateManager.GameComplete.Instance);
-                    }
-                }
-            }
-        }
-
-
         #endregion
 
         #region IemGameEmbankmentGame
 
-
+         
         public class EMGameManager : IemGameBase.GameManager
         {
             public EMGameManager() : base()
@@ -149,78 +102,75 @@ namespace Oxide.Plugins
                 Enabled = true;
                 Mode = "Team";
                 Name = "Embankment";
-                //  TileImgUrl = "http://www.limepepper.co.uk/images/PNG_Example.png";
+                TileImgUrl = "http://www.limepepper.co.uk/images/high_walls_08.jpg";
             }
 
-            public override IemGameBase.IemGame SendPlayerToGameManager(BasePlayer player)
+
+            public override IemGameBase.IemGame CreateGame(BasePlayer player)
             {
-                bool foundactive = false;
-                IemGameEmbankmentGame newGame = null;
-                foreach (var mygame in games)
-                {
-                    if(mygame.CurrentState== IemUtils.State.Before||
-                        mygame.CurrentState == IemUtils.State.Paused||
-                        mygame.CurrentState == IemUtils.State.Running)
-                    {
-                        foundactive = true;
-                        newGame = mygame;
-                    }
-                }
-                if (foundactive)
-                {
-                    me.Puts("in the tp game manager, found existing game for player");
-                    me.Puts("game: "+newGame.CurrentState);
-                }
-                else
-                {
-                    me.Puts("in the tp game manager, creating new game");
-                    newGame = new IemGameEmbankmentGame();
-                    games.Add(newGame);
-                    
-                }
-                newGame.Players[player.UserIDString] = new IemEmbankmentPlayer(player, newGame.teamLobby);
+                var newGame = new IemGameEmbankmentGame();
+                newGame.Players[player.UserIDString] = new IemEmbankmentPlayer(player, newGame);
                 IemUI.ShowTeamUiForPlayer(player, newGame);
+                if (!newGame.CanStart())
+                    IemUI.CreateGameBanner(player, newGame.CanStartCriteria());
                 return newGame;
             }
         }
-
+         
         public class IemEmbankmentPlayer : IemGameBase.IemPlayer
         {
-            public IemEmbankmentPlayer(BasePlayer player) : base(player)
+            public IemEmbankmentPlayer(BasePlayer player, IemGameEmbankmentGame game) : base(player)
             {
+                IemUtils.TeleportPlayerPosition(player, game.teamLobby.location);
+                me.IemUtils?.SaveInventory(player, game.GetGuid());
+                game.teamLobby.OpenDoors();
             }
-
-            public IemEmbankmentPlayer(BasePlayer player, IncursionHoldingArea.TeamSelectLobby teamLobby) : base(player)
-            {
-                IemUtils.TeleportPlayerPosition(player, teamLobby.location);
-            } 
-        }
+        }   
 
         public class IemGameEmbankmentGame : IemGameBase.IemTeamGame
         {
             public EmbankStateManager gsm;
-            public float GameLobbyWait = 12;
-            public int PartitionWait = 20;
-            public int MainPhaseWait = 20;
-            public int SuddenDeathPhaseWait = 20;
+            public float GameLobbyWait = 10;
+            public int PartitionWait = 5;
+            public int MainPhaseWait = 5;
+            public int SuddenDeathPhaseWait = 5;
             public IncursionHoldingArea.TeamSelectLobby teamLobby;
 
-            public IemGameEmbankmentGame() 
+            public IemGameEmbankmentGame()
             {
-                IemUtils.GLog("calling parameterless ctor in IemGameEmbankmentGame");
                 Name = "Embankment";
-                IemUtils.GLog("setting gamename is " + this.Name);
                 OnlyOneAtATime = true;
                 Mode = "Team";
                 MinPlayersPerTeam = 0;
 
                 //adds some teams to the game, sets the team locations
-                me.InitGame(this); 
+                InitGame();
 
                 //create the team select lobby
                 teamLobby = new IncursionHoldingArea.TeamSelectLobby("teamlobby_v1", this);
+            }
 
+            //TODO utility function, this needs to be moved to default config
+            void InitGame()
+            {
+                IemGameBase.IemTeam team1 = AddTeam(
+                    new IemGameBase.IemTeam("team_1", "blue", 1, 20, "Blue Bandits"));
 
+                team1.Location = new Vector3(27, 34, 36);
+
+                IemGameBase.IemTeam team2 = AddTeam(
+                    new IemGameBase.IemTeam("team_2", "red", 1, 20, "Red Devils"));
+                team2.Location = new Vector3(21, 41, -14);
+            }
+
+            public override IemUtils.IIemTeamPlayer AddPlayer(BasePlayer player)
+            {
+                if (!Players.ContainsKey(player.UserIDString))
+                    Players[player.UserIDString] = new IemEmbankmentPlayer(player, this);
+                IemUI.ShowTeamUiForPlayer(player, this);
+                IemUtils.TeleportPlayerPosition(player, teamLobby.location);
+
+                return (IemUtils.IIemTeamPlayer)Players[player.UserIDString];
             }
 
             public override bool StartGame()
@@ -232,40 +182,26 @@ namespace Oxide.Plugins
                     gsm = new EmbankStateManager(EmbankStateManager.Created.Instance, this);
                     gsm.ChangeState(EmbankStateManager.GameLobby.Instance);
                 }
-                else
-                {
-                    IemUtils.GLog("gsm already created");
-                }
                 return true;
-            }
+            } 
 
-            public override bool EndGame()
+            public override bool CleanUp()
             {
-                IemUtils.GLog("calling EndGame in IemGameEmbankmentGame");
-                teamLobby.Destroy();
-                base.EndGame();
+                base.CleanUp();
+
+                IemUtils.DDLog("cleaning up the game");
+                teamLobby?.Destroy();
+
+                foreach (var partition in gsm.partitions)
+                    partition?.Remove();
+
                 return true;
             }
 
             public override bool CancelGame()
             {
-
-                IemUtils.DDLog("listing in CancelGame");
-                //((IemGameEmbankmentGame)game).gsm.partition?.List();
-
-                IemUtils.GLog("calling CancelGame in IemGameEmbankmentGame");
                 gsm?.ChangeState(EmbankStateManager.GameCancelled.Instance);
-
                 base.CancelGame();
-                return true;
-            }
-
-            public override bool CleanUp()
-            {
-                IemUtils.GLog("calling cleanup in IemGameEmbankmentGame");
-                gsm.ChangeState(EmbankStateManager.CleanUp.Instance);
-
-                base.CleanUp();
                 return true;
             }
 
@@ -274,9 +210,9 @@ namespace Oxide.Plugins
 
                 IemUtils.GLog("moving players to game");
 
-                if (!IemUtils.CheckPointNearToLocation(player.transform.position, location, 2))
-                    IemUtils.MovePlayerTo(player, location);
-                //IemUtils.TeleportPlayerPosition(player, location);
+                if (!IemUtils.CheckPointNearToLocation(
+                    player.transform.position, location, 2))
+                    IemUtils.TeleportPlayerPosition(player, location);
 
                 return true;
             }
@@ -284,11 +220,9 @@ namespace Oxide.Plugins
             public override IemUtils.IIemTeam Winner()
             {
                 IemUtils.IIemTeam team = null;
-                IemUtils.GLog("here");
                 int bestscore = 0;
                 foreach (var iemTeam in Teams.Values)
                 {
-
                     if (iemTeam.Score > bestscore)
                     {
                         bestscore = iemTeam.Score;
@@ -352,7 +286,6 @@ namespace Oxide.Plugins
                     gsm.ChangeState(EmbankStateManager.GameComplete.Instance);
                 }
                 return someoneWon;
-
             }
 
             public void ShowGameStatus()
@@ -361,22 +294,9 @@ namespace Oxide.Plugins
                 foreach (IemGameBase.IemTeam iemTeam in Teams.Values)
                 {
                     status += iemTeam.Name + " (" + GetCountOfLivingPlayers(iemTeam) + ") ";
-                    //foreach (IemGameBase.IemPlayer iemPlayer in iemTeam.Players.Values)
-                    //{
-                    //    BasePlayer player = IemUtils.FindPlayerByID(iemPlayer.PlayerId);
-                    //    IemUI.CreateGameStatusBanner(player, "time is ");
-                    //}
                 }
-                foreach (IemGameBase.IemTeam iemTeam in Teams.Values)
-                {
-
-                    foreach (IemGameBase.IemPlayer iemPlayer in iemTeam.Players.Values)
-                    {
-                        BasePlayer player = IemUtils.FindPlayerByID(iemPlayer.PlayerId);
-                        IemUI.CreateGameStatusBanner(player, status);
-                    }
-                }
-            }
+                IemUI.UpdateGameStatusBanner(status, this);
+            } 
 
             public void ShowGameTimer(int countdown)
             {
@@ -384,7 +304,6 @@ namespace Oxide.Plugins
 
                 foreach (IemGameBase.IemTeam iemTeam in Teams.Values)
                 {
-
                     foreach (IemGameBase.IemPlayer iemPlayer in iemTeam.Players.Values)
                     {
                         BasePlayer player = IemUtils.FindPlayerByID(iemPlayer.PlayerId);
@@ -403,7 +322,6 @@ namespace Oxide.Plugins
                     IemUtils.GLog("player died - setting player dead");
                     BasePlayer player = victim.ToPlayer();
 
-                    //       PlayerDying(player, info);
                     GetIemPlayerById(victim.UserIDString).PlayerState =
                         IemUtils.PlayerState.Dead;
 
@@ -445,16 +363,12 @@ namespace Oxide.Plugins
             public void SuddenDeath(BaseCombatEntity entity, HitInfo hitInfo)
             {
                 if (entity as BasePlayer == null || hitInfo == null) return;
-                //IemUtils.GLog("calling entities any damage");
-
+                
                 if (entity.ToPlayer() != null)
                 {
-                    IemUtils.GLog("player died");
+                    IemUtils.DLog("player died");
                     BasePlayer player = entity.ToPlayer();
-
-                    //       PlayerDying(player, info);
-                    //  GetIemPlayerById(entity.UserIDString).PlayerState =
-                    //    IemGameBase.PlayerState.Dead;
+                    
                     if (GetIemPlayerById(player.UserIDString) != null)
                     {
 
@@ -471,7 +385,7 @@ namespace Oxide.Plugins
                         IemUtils.GLog("not found player");
                     }
                 }
-            }
+            }   
 
             public void PlayerImmortal(BaseCombatEntity entity, HitInfo hitInfo)
             {
@@ -486,24 +400,15 @@ namespace Oxide.Plugins
                 {
                     IemUtils.GLog("scaling player damage to zero");
                     BasePlayer player = entity.ToPlayer();
-
-                    //       PlayerDying(player, info);
-                    //  GetIemPlayerById(entity.UserIDString).PlayerState =
-                    //    IemGameBase.PlayerState.Dead;
+                    
                     if (GetIemPlayerById(player.UserIDString) != null)
                     {
                         // TODO probably better way to scale this damage
-                        IemUtils.GLog("scaling damage");
                         //hitInfo.damageTypes.Scale(DamageType.Bullet, 0f);
                         IemUtils.NullifyDamage(ref hitInfo);
                     }
-                    else
-                    {
-                        IemUtils.GLog("not found player");
-                    }
                 }
             }
-
         }
 
         #endregion
@@ -513,7 +418,12 @@ namespace Oxide.Plugins
         public class EmbankStateManager : IemStateManager.StateManager
         {
 
-            public IemObjectPlacement.CopyPastePlacement partition;
+            public List<IemObjectPlacement.CopyPastePlacement> partitions
+                    = new List<IemObjectPlacement.CopyPastePlacement>();
+            int wallheight = 7;
+            int startheight = -30;
+            int blockshigh = 15;
+
             private IemGameEmbankmentGame eg;
 
             public EmbankStateManager(IemStateManager.IStateMachine initialState,
@@ -553,12 +463,11 @@ namespace Oxide.Plugins
                     EntitiesTakingDamage += gsm.eg.PlayerImmortal;
 
                     me.rust.RunServerCommand("env.time", "12");
-
-                    gsm.partition = new IemObjectPlacement.CopyPastePlacement(
-                        "partition2_1500_7777_3123");
-
-                    IemUtils.GLog("partition2_1500_7777_3123 " + gsm.partition);
-
+                    for (int i = 0; i <= gsm.blockshigh; i++)
+                    {
+                        gsm.partitions.Add(new IemObjectPlacement.CopyPastePlacement(
+                            "base_partition_wall", new Vector3(-500, gsm.startheight + (gsm.wallheight * i), 10)));
+                    }
 
                     // gsm.CreateGameBanner("GAME LOBBY");
                     gameLobbyWaitTimer = me.timer.Once(gsm.eg.GameLobbyWait, () =>
@@ -586,7 +495,7 @@ namespace Oxide.Plugins
                             BasePlayer player = IemUtils.FindPlayerByID(iemPlayer.PlayerId);
                             IemUI.ShowGameTimer(player, gsm.eg.GameLobbyWait - 3, "starting in: ");
 
-                            if (player.IsConnected()) 
+                            if (player.IsConnected())
                             {
                                 if (player.IsDead())
                                 {
@@ -597,10 +506,8 @@ namespace Oxide.Plugins
 
                             }
 
-                            player.EndSleeping(); 
+                            player.EndSleeping();
                             gsm.eg.MovePlayerToTeamLocation(player, iemTeam.Location);
-                            //IemOnHooks.OneLife anyDamage
-                            //= player.GetComponent<IemOnHooks.OneLife>();
 
                             IemUtils.SetMetabolismValues(player);
                             IemUtils.ClearInventory(player);
@@ -626,27 +533,6 @@ namespace Oxide.Plugins
                     }
                 }
 
-                //    iemEmbankment.Subscribe(nameof(OnRunPlayerMetabolism));
-                //    // don't handle spawn location until required
-                //    iemEmbankment.Subscribe(nameof(OnPlayerRespawn));
-
-                //    gsm.eg.MovePlayersToGame();
-
-                //    foreach (IncursionEventGame.EventPlayer eventPlayer in gsm.eg.gamePlayers.Values)
-                //    {
-                //        eventPlayer.psm.ChangeState(IncursionEventGame.PlayerInGame.Instance);
-
-                //        IncursionUI.ShowGameBanner(eventPlayer.player,
-                //            gsm.eg.GameIntroBanner);
-                //    }
-
-                //    gsm.CreateGameBanner("GAME LOBBY");
-                //    warningTimer = iemEmbankment.timer.Once(gsm.eg.GameLobbyWait, () =>
-                //    {
-                //        gsm.ChangeState(PartitionedPeriod.Instance);
-                //    });
-                //}
-
                 public new void Exit(IemStateManager.StateManager sm)
                 {
                     EmbankStateManager gsm = (EmbankStateManager)sm;
@@ -654,17 +540,7 @@ namespace Oxide.Plugins
                     gameLobbyWaitTimer.Destroy();
                     gameLobbyBannerTimer.Destroy();
 
-
                     EntitiesTakingDamage -= gsm.eg.PlayerImmortal;
-
-                    //    foreach (BasePlayer player in BasePlayer.activePlayerList)
-                    //    {
-                    //        IncursionEventGame.EventPlayer eventPlayer
-                    //            = IncursionEventGame.EventPlayer.GetEventPlayer(player);
-                    //        //eventPlayer.psm.eg = ((IncursionEvents.EventStateManager)esm).eg;
-                    //        IncursionUI.HideGameBanner(player);
-                    //    }
-                    //    iemEmbankment.Unsubscribe(nameof(OnRunPlayerMetabolism));
 
                 }
             }
@@ -685,13 +561,8 @@ namespace Oxide.Plugins
                     EmbankStateManager gsm = (EmbankStateManager)sm;
                     me.Subscribe(nameof(OnRunPlayerMetabolism));
 
-                    //    gsm.CreateGameBanner("You have " + gsm.GetEventGame().PartitionedPeriodLength +
-                    //        " minutes to build/craft weapons");
-
                     // nullify any damage
                     EntitiesTakingDamage += gsm.eg.PlayerImmortal;
-
-                    me.ScreenTimer?.Call("CreateTimer", gsm.eg.PartitionWait);
 
                     foreach (IemGameBase.IemTeam iemTeam in gsm.eg.Teams.Values)
                     {
@@ -700,11 +571,12 @@ namespace Oxide.Plugins
                             BasePlayer player = IemUtils.FindPlayerByID(iemPlayer.PlayerId);
                             //player.EndSleeping(); 
 
-                            me.Kits?.Call("GiveKit", player, "autokit");
+                            me.Kits?.Call("GiveKit", player, "embank_v1");
                             player.inventory.SendSnapshot();
                             IemUtils.PlaySound(player);
                             IemUI.CreateGameBanner(player, "Zone is Partitioned!");
 
+                            IemUI.ShowGameTimer(player, gsm.eg.PartitionWait, "partion removed in: ");
                         }
                     }
 
@@ -731,8 +603,6 @@ namespace Oxide.Plugins
                     partitionTimer?.Destroy();
                     updatesTimer?.Destroy();
 
-                    me.ScreenTimer?.Call("DestroyUI");
-
                     // remove hook on damage for immortality
                     EntitiesTakingDamage -= gsm.eg.PlayerImmortal;
                 }
@@ -741,7 +611,6 @@ namespace Oxide.Plugins
                 {
                     EmbankStateManager gsm = (EmbankStateManager)sm;
                     gsm.eg.ShowGameStatus();
-                    gsm.eg.ShowGameTimer(countdown--);
 
                 }
             }
@@ -757,22 +626,19 @@ namespace Oxide.Plugins
                 public new void Enter(IemStateManager.StateManager sm)
                 {
                     EmbankStateManager gsm = (EmbankStateManager)sm;
-                    gsm.partition.Remove();
+                    foreach (var partition in gsm.partitions)
+                        partition?.Remove();
                     foreach (IemGameBase.IemTeam iemTeam in gsm.eg.Teams.Values)
                     {
                         foreach (IemGameBase.IemPlayer iemPlayer in iemTeam.Players.Values)
                         {
                             BasePlayer player = IemUtils.FindPlayerByID(iemPlayer.PlayerId);
-                            //gsm.eg.MovePlayerToTeamLocation(player, iemTeam.Location);
-                            //IemOnHooks.OneLife anyDamage
-                            //= player.GetComponent<IemOnHooks.OneLife>();
 
                             IemUI.CreateGameBanner(player, "Main Phase, partition is removed!");
+                            IemUI.ShowGameTimer(player, gsm.eg.PartitionWait, "Main Phase: ");
                         }
-                    }
-
-                    me.ScreenTimer?.Call("CreateTimer", gsm.eg.MainPhaseWait);
-
+                    } 
+                
                     // change the player status
                     PlayerDying += gsm.eg.PlayerDied;
 
@@ -803,8 +669,7 @@ namespace Oxide.Plugins
                     PlayerDying -= gsm.eg.PlayerDied;
                     // don't log the score
                     PlayerDying -= gsm.eg.ScorePlayerKill;
-
-                    me.ScreenTimer?.Call("DestroyUI");
+                    
 
                 }
 
@@ -813,9 +678,7 @@ namespace Oxide.Plugins
                     EmbankStateManager gsm = (EmbankStateManager)sm;
 
                     gsm.eg.CheckGameState();
-
                     gsm.eg.ShowGameStatus();
-                    gsm.eg.ShowGameTimer(countdown--);
                 }
             }
 
@@ -825,8 +688,7 @@ namespace Oxide.Plugins
             {
                 private int countdown;
 
-                //private Timer warningTimer;
-                //private Timer finalWarningTimer;
+                //TODO this only works because its a team game
                 private Timer suddenDeathTimer;
                 private Timer updatesTimer;
 
@@ -836,9 +698,7 @@ namespace Oxide.Plugins
                 public new void Enter(IemStateManager.StateManager sm)
                 {
                     EmbankStateManager gsm = (EmbankStateManager)sm;
-
-                    me.ScreenTimer?.Call("CreateTimer", gsm.eg.SuddenDeathPhaseWait);
-
+                    
                     // change the player status
                     PlayerDying += gsm.eg.PlayerDied;
                     //log the score
@@ -849,8 +709,16 @@ namespace Oxide.Plugins
                     // player can't be wounded in sudden death
                     EntitiesBeingWounded += gsm.eg.SuddenDeathWounded;
 
+                    foreach (IemGameBase.IemTeam iemTeam in gsm.eg.Teams.Values)
+                    {
+                        foreach (IemGameBase.IemPlayer iemPlayer in iemTeam.Players.Values)
+                        {
+                            BasePlayer player = IemUtils.FindPlayerByID(iemPlayer.PlayerId);
 
-                    //    iemEmbankment.Subscribe(nameof(OnRunPlayerMetabolism));
+                            IemUI.ShowGameTimer(player, gsm.eg.PartitionWait, "Sudden Death: ");
+                        }
+                    }
+
 
                     suddenDeathTimer = me.timer.Once(
                         gsm.eg.SuddenDeathPhaseWait, () =>
@@ -859,19 +727,8 @@ namespace Oxide.Plugins
                         });
                     //}
 
-                    foreach (IemGameBase.IemTeam iemTeam in gsm.eg.Teams.Values)
-                    {
-                        foreach (IemGameBase.IemPlayer iemPlayer in iemTeam.Players.Values)
-                        {
-                            BasePlayer player = IemUtils.FindPlayerByID(iemPlayer.PlayerId);
-                            //gsm.eg.MovePlayerToTeamLocation(player, iemTeam.Location);
-                            //IemOnHooks.OneLife anyDamage
-                            //= player.GetComponent<IemOnHooks.OneLife>();
-                            //IemUtils.SetMetabolismValues(player);
+                    IemUI.UpdateGameBanner("Sudden Death - all hits are fatal!!!", gsm.eg);
 
-                            IemUI.CreateGameBanner(player, "Sudden Death - all hits are fatal!!!");
-                        }
-                    }
 
                     countdown = gsm.eg.SuddenDeathPhaseWait;
                     updatesTimer = me.timer.Every(1f, () =>
@@ -884,6 +741,8 @@ namespace Oxide.Plugins
                 public new void Exit(IemStateManager.StateManager sm)
                 {
                     EmbankStateManager gsm = (EmbankStateManager)sm;
+                    IemUI.UpdateGameStatusBanner("", gsm.eg);
+                    IemUI.UpdateGameBanner("", gsm.eg);
 
                     // set the player status
                     PlayerDying -= gsm.eg.PlayerDied;
@@ -894,9 +753,7 @@ namespace Oxide.Plugins
                     EntitiesTakingDamage -= gsm.eg.SuddenDeath;
                     // player can't be wounded in sudden death
                     EntitiesBeingWounded -= gsm.eg.SuddenDeathWounded;
-
-                    me.ScreenTimer?.Call("DestroyUI");
-
+                    
                     suddenDeathTimer?.Destroy();
                     updatesTimer?.Destroy();
                 }
@@ -908,7 +765,6 @@ namespace Oxide.Plugins
 
                     gsm.eg.CheckGameState();
                     gsm.eg.ShowGameStatus();
-                    gsm.eg.ShowGameTimer(countdown--);
                 }
 
             }
@@ -929,22 +785,20 @@ namespace Oxide.Plugins
                     resultsTimer = IemUI.ShowResultsUiFor(
                         gsm.eg.Players.Select(d => d.Value).ToList(), gsm.eg, 8);
 
+                    gsm.eg.EndGame();
+
                     completeTimer = me.timer.Once(10f, () =>
                     {
-                        IemUtils.GLog("calling game complete on the event manager");
-                        gsm.eg.EndGame();
-
+                        gsm.ChangeState(EmbankStateManager.CleanUp.Instance);
                     });
-
                 }
 
                 public new void Exit(IemStateManager.StateManager sm)
                 {
                     EmbankStateManager gsm = (EmbankStateManager)sm;
+
+                    IemUI.UpdateGameStatusBanner("", gsm.eg);
                     completeTimer?.Destroy();
-                    // gsm.CreateGameBanner("");
-                    //gsm.eg.RemoveGameResultUI();
-                    //iemEmbankment.Unsubscribe(nameof(OnRunPlayerMetabolism));
                 }
 
             }
@@ -956,14 +810,9 @@ namespace Oxide.Plugins
                 public new void Enter(IemStateManager.StateManager sm)
                 {
                     EmbankStateManager gsm = (EmbankStateManager)sm;
-                    IemUtils.DDLog("list the wall in cancel game");
-
-
-                    //gsm.partition.List();
-
-                    IemUtils.DDLog("removing the wall in cancel game");
-
-                    gsm.partition.Remove();
+                    
+                    foreach (var partition in gsm.partitions)
+                        partition?.Remove();
 
                     me.Unsubscribe(nameof(OnRunPlayerMetabolism));
                 }
@@ -982,18 +831,24 @@ namespace Oxide.Plugins
                 {
                     EmbankStateManager gsm = (EmbankStateManager)sm;
 
-                    IemUtils.DDLog("removing the wall in cleanup game");
-                    gsm.partition?.Remove();
+                    gsm.eg.teamLobby.Destroy();
+
+                    foreach (IemGameBase.IemTeam iemTeam in gsm.eg.Teams.Values)
+                    {
+                        foreach (IemGameBase.IemPlayer iemPlayer in iemTeam.Players.Values)
+                        {
+                            BasePlayer player = IemUtils.FindPlayerByID(iemPlayer.PlayerId);
+                            me.IemUtils?.RestoreInventory(player, gsm.eg.GetGuid());
+                        }
+                    }
+
+                    foreach (var partition in gsm.partitions)
+                        partition?.Remove();
 
                     me.Unsubscribe(nameof(OnRunPlayerMetabolism));
                 }
             }
-
         }
-
-        #endregion
-
-        #region static methods
 
         #endregion
 
@@ -1061,6 +916,18 @@ namespace Oxide.Plugins
 
         #endregion
 
+
+        string ListGames()
+        {
+            string buff = "listing games in embank\n";
+            foreach (var mygame in gm.games)
+            {
+                buff += "Game: " + mygame.Name;
+
+            }
+            return buff;
+        }
+
         #region console
 
         [ConsoleCommand("embank")]
@@ -1070,18 +937,40 @@ namespace Oxide.Plugins
                 return;
             switch (arg.Args[0].ToLower())
             {
-                case "create_start":
-               //     InitGame(arg.Player());
-                    break;
                 case "next":
                     NextPhase();
                     break;
-                case "autostart":
-                    Config["Enabled"] = true;
-               //     InitGame(arg.Player());
+                case "list_games":
+
+                    SendReply(arg, me.ListGames());
                     break;
             }
         }
+
+        // debuggin function to allow moving to next phase quickly
+        void NextPhase()
+        {
+            if (game != null)
+            {
+                if (game.CurrentState == IemUtils.State.Running)
+                {
+                    IemGameEmbankmentGame teamgame = (IemGameEmbankmentGame)game;
+                    if (teamgame.gsm.IsAny(EmbankStateManager.PartitionedPeriod.Instance))
+                    {
+                        teamgame.gsm.ChangeState(EmbankStateManager.MainPhase.Instance);
+                    }
+                    else if (teamgame.gsm.IsAny(EmbankStateManager.MainPhase.Instance))
+                    {
+                        teamgame.gsm.ChangeState(EmbankStateManager.SuddenDeath.Instance);
+                    }
+                    else if (teamgame.gsm.IsAny(EmbankStateManager.SuddenDeath.Instance))
+                    {
+                        teamgame.gsm.ChangeState(EmbankStateManager.GameComplete.Instance);
+                    }
+                }
+            }
+        }
+
         #endregion
     }
 }

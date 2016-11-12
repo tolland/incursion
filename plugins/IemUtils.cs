@@ -20,6 +20,11 @@ namespace Oxide.Plugins
         #region boilerplate
         [PluginReference]
         Plugin ZoneManager;
+
+
+
+
+
         static Game.Rust.Libraries.Rust rust = GetLibrary<Game.Rust.Libraries.Rust>();
         static FieldInfo monumentsField = typeof(TerrainPath).GetField("Monuments",
             (BindingFlags.Public | BindingFlags.Static | BindingFlags.Instance |
@@ -54,13 +59,36 @@ namespace Oxide.Plugins
 
         private readonly HashSet<ulong> teleporting = new HashSet<ulong>();
 
+
+        int xcount = (int)Math.Floor(TerrainMeta.Size.x / 100) - 1;
+        int zcount = (int)Math.Floor(TerrainMeta.Size.z / 100) - 1;
+        int xthis = 1;
+        int zthis = 1;
+
+        public Vector3 NextFreeLocation()
+        {
+            me.Puts("yield new vector " + new Vector3(xthis * 100, 136, zthis * 100));
+            var buff = new Vector3(xthis * 100, 136, zthis * 100);
+            zthis++;
+            xthis++;
+            if (xthis > xcount)
+                xthis = 1;
+            if (zthis > zcount)
+                zthis = 1;
+            return buff;
+        }
+
         void OnEntityTakeDamage(BaseCombatEntity entity, HitInfo hitinfo)
         {
             var player = entity.ToPlayer();
 
             if (hitinfo.damageTypes.Has(DamageType.Fall))
             {
-                me.Puts("detected fall damage in teleport");
+                me.Puts("detected fall damage in teleport, teleport count us " + teleporting.Count);
+                foreach (var teleport in teleporting)
+                {
+                    me.Puts("userid is " + teleport);
+                }
                 if (teleporting.Contains(player.userID))
                 {
                     me.Puts("splatting fall damage in teleport");
@@ -125,6 +153,42 @@ namespace Oxide.Plugins
             //TODO should save and restore inventory
             player.inventory.Strip();
         }
+
+        public static void RefillBeltMagazines(BasePlayer player)
+        {
+            int length = 6; // this needs to be changed if the belt size changes
+            for (int i = 0; i < length; i++)
+            {
+                Item item = player.inventory.containerBelt.GetSlot(i);
+                if (item != null)
+                {
+                    item.condition = item.info.condition.max;
+
+                    //projectile.GetItem().condition = projectile.GetItem().info.condition.max;
+                    //if (projectile.primaryMagazine.contents > 0) return;
+                    var weapon = item.GetHeldEntity() as BaseProjectile;
+                    if (weapon != null)
+                    {
+                        (item.GetHeldEntity() as BaseProjectile).primaryMagazine.contents = (item.GetHeldEntity() as BaseProjectile).primaryMagazine.capacity;
+                        weapon.SendNetworkUpdateImmediate();
+                    }
+                }
+            }
+        }
+
+        public static void DrawChatMessage(BasePlayer onlinePlayer, BaseEntity entity, string message)
+        {
+            float distanceBetween = Vector3.Distance(entity.transform.position, onlinePlayer.transform.position);
+
+            if (distanceBetween <= 50)
+            {
+                string lastMessage = message;
+                Color messageColor = new Color(1, 1, 1, 1);
+
+                onlinePlayer.SendConsoleCommand("ddraw.text", 2f, messageColor, entity.transform.position + new Vector3(0, 1.9f, 0), "<size=25>" + lastMessage + "</size>");
+            }
+        }
+
         private Timer _timer;
 
         private class FrozenPlayerInfo
@@ -257,7 +321,58 @@ namespace Oxide.Plugins
 
         #region zone utils
 
-        public static void CreateZone(string name, Vector3 location, int radius)
+        public class GameZone
+        {
+            string zoneid;
+            BaseEntity sphere;
+            Vector3 location;
+
+
+            public GameZone(string name, Vector3 location, int radius)
+            {
+                iemUtils.Puts("creating zone at " + location);
+
+                //ZoneManager.Call("EraseZone", "zone_" + name);
+
+                iemUtils.ZoneManager.Call("CreateOrUpdateZone",
+                    "zone_" + name,
+                    new string[]
+                    {
+                    "radius", radius.ToString(),
+                    "autolights", "true",
+                    "eject", "false",
+                    "enter_message", "",
+                    "leave_message", "",
+                    "killsleepers", "true"
+                    }, location);
+
+                this.location = location;
+                zoneid = name;
+                sphere = CreateSphere(location, (radius * 2) + 1);
+            }
+
+            public void Remove()
+            {
+                me.ZoneManager.Call("EraseZone", zoneid);
+                sphere.KillMessage();
+            }
+
+        }
+
+        public static GameZone CreateGameZone(string name, Vector3 location, int radius)
+        {
+
+
+
+
+
+            //CreateSphere(location, (radius * 2) + 1);
+
+            return null;
+        }
+
+
+        public static BaseEntity CreateZone(string name, Vector3 location, int radius)
         {
             iemUtils.Puts("creating zone at " + location);
 
@@ -275,7 +390,7 @@ namespace Oxide.Plugins
                     "killsleepers", "true"
                 }, location);
 
-            CreateSphere(location, (radius * 2) + 1);
+            return CreateSphere(location, (radius * 2) + 1);
 
         }
 
@@ -308,6 +423,20 @@ namespace Oxide.Plugins
 
         static int collisionLayer = LayerMask.GetMask("Construction", "Construction Trigger",
             "Trigger", "Deployed", "Default");
+
+
+        public static List<T> FindComponentsNearToLocation<T>(Vector3 location, int radius)
+        {
+            List<T> components = new List<T>();
+
+            foreach (Collider col in Physics.OverlapSphere(location, radius))
+            {
+                if (col.GetComponentInParent<T>() == null) continue;
+                components.Add(col.GetComponentInParent<T>());
+            }
+
+            return components;
+        }
 
         // TODO maybe find the nearest collider?
         public static T FindComponentNearestToLocation<T>(Vector3 location, int radius)
@@ -380,7 +509,7 @@ namespace Oxide.Plugins
             {
                 //DLog("object is " + monument_gobject.name);
 
-                if (monument_gobject.name.EndsWith(prefab))
+                if (monument_gobject.name.ToLower().EndsWith(prefab.ToLower()))
                 {
                     //Puts (gobject.GetInstanceID ().ToString ());
                     //var pos = monument_gobject.transform.position;
@@ -561,7 +690,7 @@ namespace Oxide.Plugins
         public static void TeleportPlayerPosition(BasePlayer player, Vector3 destination)
         {
             me.teleporting.Add(player.userID);
-            //DLog("teleporting player from " + player.transform.position.ToString());
+            DLog("teleporting player from " + player.transform.position.ToString());
             //DLog("teleporting player to   " + destination.ToString());
             destination = GetGroundY(destination);
             player.MovePosition(destination);
@@ -572,8 +701,13 @@ namespace Oxide.Plugins
             player.ClientRPCPlayer(null, player, "StartLoading", null, null, null, null, null);
             player.SendFullSnapshot();
 
+            DLog("finished teleporting player from " + player.transform.position.ToString());
+            me.timer.Once(10f, () =>
+            {
+                if (me.teleporting.Contains(player.userID))
+                    me.teleporting.Remove(player.userID);
+            });
 
-            me.teleporting.Remove(player.userID);
         }
 
         public static void Teleport(BasePlayer player, Vector3 position)
@@ -886,7 +1020,7 @@ namespace Oxide.Plugins
             bool EndGame();
             bool CancelGame();
             bool PauseGame();
-            bool CleanUp();
+            string CanStartCriteria();
         }
 
         public interface IIemTeamGame : IIemGame
@@ -907,6 +1041,9 @@ namespace Oxide.Plugins
             string Name { get; set; }
             int Score { get; set; }
             PlayerState PlayerState { get; set; }
+
+            Vector3 PreviousLocation { get; set; }
+            Vector3 PreviousRotation { get; set; }
 
             //TODO might need to populate this from the database
             Guid GetGuid();
@@ -951,6 +1088,173 @@ namespace Oxide.Plugins
             //IemGame CreateGame(string gamename);
             void AddPlayer(IIemTeamPlayer player);
             void RemovePlayer(IIemTeamPlayer player);
+        }
+
+        #endregion
+
+        #region save restore inventory
+
+        // jailData = new JailDataStorage();
+        Dictionary<string, JailDataStorage> GameItemStorage = new Dictionary<string, JailDataStorage>();
+
+
+        class JailDataStorage
+        {
+            public Dictionary<ulong, Inmate> Prisoners = new Dictionary<ulong, Inmate>();
+        }
+        class Inmate
+        {
+            public Vector3 initialPos;
+            public string prisonName;
+            public int cellNumber;
+            public double expireTime;
+            public List<InvItem> savedInventory = new List<InvItem>();
+        }
+        class InvItem
+        {
+            public int itemid;
+            public int skinid;
+            public string container;
+            public int amount;
+            public bool weapon;
+            public int ammo;
+            public string ammotype;
+            public List<int> mods;
+            public float condition;
+
+            public InvItem()
+            {
+            }
+        }
+
+        public void SaveInventory(BasePlayer player, Guid gameGuid)
+        {
+            Dictionary<ulong, Inmate> Prisoners;
+
+            if (!GameItemStorage.ContainsKey(gameGuid.ToString()))
+            {
+                GameItemStorage.Add(gameGuid.ToString(),
+                    new JailDataStorage());
+            }
+
+            Prisoners = GameItemStorage[gameGuid.ToString()].Prisoners;
+
+            if (!Prisoners.ContainsKey(player.userID))
+            {
+                Inmate inmate = new Inmate() { initialPos = player.transform.position, prisonName = "test", cellNumber = 0, expireTime = 11.11 };
+                Prisoners.Add(player.userID, inmate);
+            }
+
+
+
+            Prisoners[player.userID].savedInventory.Clear();
+            List<InvItem> kititems = new List<InvItem>();
+            foreach (Item item in player.inventory.containerWear.itemList)
+            {
+                if (item != null)
+                {
+                    var iteminfo = AddItemToSave(item, "wear");
+                    kititems.Add(iteminfo);
+                }
+            }
+            foreach (Item item in player.inventory.containerMain.itemList)
+            {
+                if (item != null)
+                {
+                    var iteminfo = AddItemToSave(item, "main");
+                    kititems.Add(iteminfo);
+                }
+            }
+            foreach (Item item in player.inventory.containerBelt.itemList)
+            {
+                if (item != null)
+                {
+                    var iteminfo = AddItemToSave(item, "belt");
+                    kititems.Add(iteminfo);
+                }
+            }
+            Prisoners[player.userID].savedInventory = kititems;
+        }
+
+        private InvItem AddItemToSave(Item item, string container)
+        {
+            InvItem iItem = new InvItem();
+            iItem.ammo = 0;
+            iItem.amount = item.amount;
+            iItem.mods = new List<int>();
+
+            iItem.skinid = (int)item.skin;
+            iItem.container = container;
+
+
+            iItem.condition = item.condition;
+            iItem.itemid = item.info.itemid;
+            iItem.weapon = false;
+
+            if (item.info.category.ToString() == "Weapon")
+            {
+                BaseProjectile weapon = item.GetHeldEntity() as BaseProjectile;
+                if (weapon != null)
+                {
+                    if (weapon.primaryMagazine != null)
+                    {
+                        iItem.weapon = true;
+                        iItem.ammo = weapon.primaryMagazine.contents;
+                        if (item.contents != null)
+                            foreach (var mod in item.contents.itemList)
+                            {
+                                if (mod.info.itemid != 0)
+                                    iItem.mods.Add(mod.info.itemid);
+                            }
+                    }
+                }
+            }
+            return iItem;
+        }
+        public void RestoreInventory(BasePlayer player, Guid gameGuid)
+        {
+            Dictionary<ulong, Inmate> Prisoners;
+
+            if (!GameItemStorage.ContainsKey(gameGuid.ToString()))
+            {
+                GameItemStorage.Add(gameGuid.ToString(),
+                    new JailDataStorage());
+            }
+
+            Prisoners = GameItemStorage[gameGuid.ToString()].Prisoners;
+
+
+            player.inventory.Strip();
+            foreach (InvItem kitem in Prisoners[player.userID].savedInventory)
+            {
+                if (kitem.weapon)
+                    player.inventory.GiveItem(BuildWeapon(kitem.itemid, kitem.ammo, kitem.skinid, kitem.mods, kitem.condition), kitem.container == "belt" ? player.inventory.containerBelt : kitem.container == "wear" ? player.inventory.containerWear : player.inventory.containerMain);
+                else player.inventory.GiveItem(BuildItem(kitem.itemid, kitem.amount, kitem.skinid, kitem.condition), kitem.container == "belt" ? player.inventory.containerBelt : kitem.container == "wear" ? player.inventory.containerWear : player.inventory.containerMain);
+            }
+        }
+        private Item BuildItem(int itemid, int amount, int skin, float cond)
+        {
+            if (amount < 1) amount = 1;
+            Item item = ItemManager.CreateByItemID(itemid, amount);
+            item.conditionNormalized = cond;
+            return item;
+        }
+        private Item BuildWeapon(int id, int ammo, int skin, List<int> mods, float cond)
+        {
+            Item item = ItemManager.CreateByItemID(id, 1);
+            item.conditionNormalized = cond;
+            var weapon = item.GetHeldEntity() as BaseProjectile;
+            if (weapon != null)
+            {
+                (item.GetHeldEntity() as BaseProjectile).primaryMagazine.contents = ammo;
+            }
+            if (mods != null)
+                foreach (var mod in mods)
+                {
+                    item.contents.AddItem(BuildItem(mod, 1, 0, cond).info, 1);
+                }
+
+            return item;
         }
 
         #endregion

@@ -1,5 +1,4 @@
 ﻿//Requires: IemUtils
-
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -19,9 +18,7 @@ namespace Oxide.Plugins
         static IemGameBase iemGameBase;
         static IemGameBase me;
 
-        static List<IemUtils.IIemGame> games = new List<IemUtils.IIemGame>();
-        static Dictionary<string, GameManager> gameManagers = new Dictionary<string, GameManager>();
-
+        public static Dictionary<string, GameManager> gameManagers = new Dictionary<string, GameManager>();
 
         static GameManager gm;
 
@@ -36,11 +33,19 @@ namespace Oxide.Plugins
             IemUtils.LogL("IemGame: Init complete");
         }
 
+        Timer todTimer = null;
+
         void Loaded()
         {
             gm = new GameManager();
             IemGameBase.RegisterGameManager(gm);
             IemUtils.LogL("IemGame: Loaded complete");
+            timer.Every(300, () =>
+            {
+
+                me.rust.RunServerCommand("env.time", "12");
+            });
+
         }
 
         void Unload()
@@ -51,7 +56,8 @@ namespace Oxide.Plugins
 
         void OnServerInitialized()
         {
-           // IemGame.CreateGame("Base Game");
+            // IemGame.CreateGame("Base Game");
+
         }
 
         #endregion
@@ -67,6 +73,15 @@ namespace Oxide.Plugins
         public static void UnregisterGameManager(GameManager gm)
         {
             //TODO remove from active
+            foreach (var game in gm.games)
+            {
+                if (game.CurrentState == IemUtils.State.Before
+                    || game.CurrentState == IemUtils.State.Running
+                    || game.CurrentState == IemUtils.State.Paused)
+                {
+                    game.RestoreBasePlayers();
+                }
+            }
             //IemUtils.DLog("unregistering game type" + typeof(IemGame));
             if (gameManagers.ContainsKey(gm.GetType().Name))
                 gameManagers.Remove(gm.GetType().Name);
@@ -79,35 +94,6 @@ namespace Oxide.Plugins
             IemUtils.DLog("listing game managers registered");
 
             return gameManagers;
-        }
-
-        static bool RemoveFromActive<IemGame>()
-        {
-            foreach (var game in games)
-            {
-                //IemUtils.DLog("removing from active");
-                if (game.GetType() == typeof(IemGame))
-                {
-                    game.CancelGame();
-                    game.CleanUp();
-                    games.Remove(game);
-                    return true;
-                }
-            }
-            return false;
-        }
-
-        static bool RemoveFromActive(string gametype)
-        {
-            foreach (var game in games)
-            {
-                if (game.GetType() == typeof(IemGame))
-                {
-                    games.Remove(game);
-                    return true;
-                }
-            }
-            return false;
         }
 
         public static void StartFromMenu(BasePlayer player, string game)
@@ -138,8 +124,13 @@ namespace Oxide.Plugins
         {
             public string Mode { get; set; }
             public string Name { get; set; }
+            public string Description { get; set; }
             public string TileImgUrl { get; set; }
             public bool Enabled { get; set; }
+
+
+            public List<IemGame> games
+                = new List<IemGame>();
 
             public GameManager()
             {
@@ -147,19 +138,84 @@ namespace Oxide.Plugins
                 Name = "Default Game Manager";
                 TileImgUrl = "http://www.limepepper.co.uk/images/games-icon.png";
                 Enabled = false;
+                Description = "Here is where some information described the game\n" +
+                    "should go.\n" +
+                    "and you can write some stuff, and put it here.\n" +
+                    "more text more text <color=red>text in red</color>";
+
+
             }
 
-            // player who is starting the game, if its a solo, individual game
+            // player who is requesting the game, if its a solo, individual game
             public virtual IemGame SendPlayerToGameManager(BasePlayer player)
             {
-                IemGame game = SendPlayerToGameManager(player);
-                RegisterGame(game);
-                return game;
+                IemGame currentGame = null;
+                foreach (IemGameBase.IemGame game in games)
+                {
+                    if (game.CurrentState == IemUtils.State.Before)
+                    {
+                        me.Puts("existing game in before state");
+                        if (game is IemSoloGame)
+                        {
+                            if (((IemSoloGame)game).UserIDString == player.UserIDString)
+                            {
+                                currentGame = game;
+                            }
+                        }
+                        else if (game is IemTeamGame)
+                        {
+                            currentGame = game;
+                            ((IemTeamGame)currentGame).SendPlayerToGame(player);
+                        }
+                    }
+                    else if (game.CurrentState == IemUtils.State.Running
+                     || game.CurrentState == IemUtils.State.Paused)
+                    {
+                        // TODO this exists for the purpose of handling 
+                        // sending a player back to game they are already in
+                        me.Puts("existing game running or paused");
+                        if (game is IemSoloGame)
+                        {
+                            if (((IemSoloGame)game).UserIDString == player.UserIDString)
+                            {
+                                currentGame = game;
+                            }
+                        }
+                        else if (game is IemTeamGame)
+                        {
+                            currentGame = game;
+                        }
+                    }
+                    else if (game.CurrentState == IemUtils.State.Complete
+                        || game.CurrentState == IemUtils.State.Cancelled)
+                    {
+
+                    }
+                }
+
+                if (currentGame == null)
+                {
+                    //get a new game from the GM implementation
+                    currentGame = CreateGame(player);
+                    RegisterGame(currentGame);
+                }
+                return currentGame;
+            }
+
+            /// <summary>
+            /// override this in the implementation to return the concrete game instance
+            /// </summary>
+            /// <param name="player"></param>
+            /// <returns></returns>
+            public virtual IemGame CreateGame(BasePlayer player)
+            {
+                return null;
             }
 
             public virtual void RegisterGame(IemGame game)
             {
-                games.Add(game);
+                if (!games.Contains(game))
+                    games.Add(game);
             }
         }
 
@@ -174,6 +230,17 @@ namespace Oxide.Plugins
             public Dictionary<string, IemUtils.IIemPlayer> Players { get; set; }
             public int MaxPlayers { get; set; }
             public int MinPlayers { get; set; }
+
+            //track gamezones
+            public Dictionary<string, IemUtils.GameZone> gamezones = new Dictionary<string, IemUtils.GameZone>();
+
+            public void AddGameZone(string name, Vector3 location, int radius)
+            {
+                gamezones.Add(
+                           name,
+                           new IemUtils.GameZone(name,
+                           location, 2));
+            }
 
             Guid _guid;
 
@@ -203,7 +270,13 @@ namespace Oxide.Plugins
                 return true;
             }
 
-            public virtual bool StartGame() 
+            public virtual string CanStartCriteria()
+            {
+                return "";
+            }
+
+
+            public virtual bool StartGame()
             {
 
                 IemUtils.DLog("calling StartGame in IemGameBase");
@@ -211,6 +284,7 @@ namespace Oxide.Plugins
                     return false;
                 CurrentState = IemUtils.State.Running;
                 StartedTime = DateTime.Now;
+                Interface.Oxide.CallHook("OnGameStarted", this);
                 return true;
             }
 
@@ -223,6 +297,7 @@ namespace Oxide.Plugins
             {
                 CurrentState = IemUtils.State.Complete;
                 EndedTime = DateTime.Now;
+                CleanUp();
                 Interface.Oxide.CallHook("OnGameEnded", this);
                 return true;
             }
@@ -231,6 +306,7 @@ namespace Oxide.Plugins
             {
                 //IemUtils.DLog("calling CancelGame in IemGame");
                 CurrentState = IemUtils.State.Cancelled;
+                CleanUp();
                 Interface.Oxide.CallHook("OnGameCancelled", this);
                 return true;
             }
@@ -243,13 +319,36 @@ namespace Oxide.Plugins
 
             public virtual bool CleanUp()
             {
-                //CurrentState = State.Paused;
+                //CurrentState = IemUtils.State.Cancelled;
+                foreach(var gamezone in gamezones.Values)
+                {
+                    gamezone.Remove();
+                }
                 return true;
+            }
+
+            public virtual void RestoreBasePlayers()
+            {
+                foreach (var player in Players.Values)
+                {
+                    IemUtils.TeleportPlayerPosition(BasePlayer.Find(player.PlayerId),
+                        player.PreviousLocation);
+                }
             }
         }
 
         public class IemSoloGame : IemGame
         {
+            public BasePlayer player;
+            public string UserIDString;
+            public IemGameBase.IemPlayer iemPlayer;
+
+            public IemSoloGame(BasePlayer newPlayer)
+            {
+                player = newPlayer;
+                UserIDString = player.UserIDString;
+            }
+
 
             public virtual bool StartGame(IemGameBase.IemPlayer player)
             {
@@ -261,7 +360,7 @@ namespace Oxide.Plugins
                 StartedTime = DateTime.Now;
                 return true;
             }
-        } 
+        }
 
         public class IemIndividualGame : IemGame
         {
@@ -295,6 +394,18 @@ namespace Oxide.Plugins
                 MaxPlayersPerTeam = 10;
                 MinPlayersPerTeam = 1;
             }
+
+            //TODO is this the same as AddPlayer to game??
+            public IemUtils.IIemTeamPlayer SendPlayerToGame(BasePlayer player)
+            {
+                return AddPlayer(player);
+            }
+
+            public virtual IemUtils.IIemTeamPlayer AddPlayer(BasePlayer player)
+            {
+                return null;
+            }
+
 
             public override bool CanStart()
             {
@@ -346,6 +457,59 @@ namespace Oxide.Plugins
 
                 return base.CanStart();
 
+            }
+
+
+
+            public string CanStartCriteria()
+            {
+
+                int totalPlayers = 0;
+                string buff = "";
+
+                foreach (KeyValuePair<string, IemUtils.IIemTeam> team in Teams)
+                {
+                    if (team.Value.Players.Count < team.Value.MinPlayers
+                        || team.Value.Players.Count < MinPlayersPerTeam)
+                    {
+                        buff += "<color=" + team.Value.Color + ">" +
+                            team.Value.Name + "</color>" +
+                            "<color=red>(" + team.Value.Players.Count + "/" +
+                              Math.Max(team.Value.MinPlayers, MinPlayersPerTeam) + ")</color> ";
+
+                    }
+                    else
+                    {
+                        buff += "<color=" + team.Value.Color + ">" +
+                            team.Value.Name + "</color>" +
+                            "<color=blue>(" + team.Value.Players.Count + "/" +
+                              Math.Max(team.Value.MinPlayers, MinPlayersPerTeam) + ")</color> ";
+                    }
+
+                    if (team.Value.Players.Count > team.Value.MaxPlayers
+                        || team.Value.Players.Count > MaxPlayersPerTeam)
+                    {
+
+                        buff += "<color=" + team.Value.Color + ">" +
+                            team.Value.Name + "</color>" +
+                        team.Value.Name + "<color=red>(" + team.Value.Players.Count + "/" +
+                              Math.Min(MaxPlayersPerTeam, team.Value.MaxPlayers) + ")</color> ";
+                    }
+                    totalPlayers = totalPlayers + team.Value.Players.Count;
+                }
+
+                if (totalPlayers < MinPlayers)
+                {
+                    buff += "below min players for game: " + MinPlayers;
+                }
+
+                if (totalPlayers > MaxPlayers)
+                {
+                    buff += "above max players for game: " + MaxPlayers;
+                }
+
+
+                return buff;
             }
 
 
@@ -469,12 +633,15 @@ namespace Oxide.Plugins
 
                 if (!Players.ContainsKey(player.PlayerId))
                     Players.Add(player.PlayerId, player);
+
                 player.Team = this;
                 player.TeamGame = TeamGame;
 
                 if (!TeamGame.Players.ContainsKey(player.PlayerId))
                     TeamGame.Players.Add(player.PlayerId, player);
 
+                if (Players.Count > 0)
+                    State = IemUtils.TeamState.Before;
             }
 
             public void RemovePlayer(IemUtils.IIemTeamPlayer player)
@@ -482,6 +649,10 @@ namespace Oxide.Plugins
                 if (Players.ContainsKey(player.PlayerId))
                     Players.Remove(player.PlayerId);
                 player.Team = null;
+
+                if (Players.Count == 0)
+                    State = IemUtils.TeamState.Empty;
+
             }
         }
 
@@ -498,12 +669,12 @@ namespace Oxide.Plugins
             public IemUtils.PlayerState PlayerState { get; set; }
             Guid _guid;
 
-            public Guid GetGuid() 
+            public Guid GetGuid()
             {
                 return _guid;
             }
-            public Vector3 previousLocation;
-            public Vector3 previousRotation;
+            public Vector3 PreviousLocation { get; set; }
+            public Vector3 PreviousRotation { get; set; }
 
             public IemPlayer(BasePlayer player)
             {
@@ -512,8 +683,10 @@ namespace Oxide.Plugins
                 Score = 0;
                 Name = player.displayName;
                 PlayerState = IemUtils.PlayerState.Alive;
-                previousLocation = player.transform.position;
-                previousRotation = player.GetNetworkRotation();
+                PreviousLocation = player.transform.position;
+                PreviousRotation = player.GetNetworkRotation();
+
+
             }
 
             //TODO this is stupid
@@ -530,53 +703,64 @@ namespace Oxide.Plugins
         void GetActiveGames()
         {
 
-            foreach (var game in games)
-            {
-                //SendConsoleMessage(arg, " - game state is " +
-                //                        game.CurrentState + game.StartedTime);
-            }
+            //   foreach (var game in games)
+            //     {
+            //SendConsoleMessage(arg, " - game state is " +
+            //                        game.CurrentState + game.StartedTime);
+            //    }
         }
 
 
         void ListActiveGames(ConsoleSystem.Arg arg)
         {
-            SendConsoleMessage(arg, "game count is " + games.Count);
-            foreach (var game in games)
+            foreach (var game_manager in gameManagers.Values)
             {
-                var messages = new List<string>();
-                messages.Add("active game: " + game.Name);
-                messages.Add(" - status: " +
-                              game.CurrentState);
-                messages.Add(" - type: " +
-                              game.GetType());
-
-                if (game.CurrentState != IemUtils.State.Before)
-                    messages.Add(" - started: " +
-                              game.StartedTime);
-
-                if (game.CurrentState == IemUtils.State.Complete ||
-                    game.CurrentState == IemUtils.State.Cancelled)
-                    messages.Add(" - ended: " +
-                              game.EndedTime);
-
-                if (game is IemTeamGame)
+                SendConsoleMessage(arg, ">>>> game manager for " + game_manager.Name + "<<<<<");
+                SendConsoleMessage(arg, "game count is " + game_manager.games.Count);
+                foreach (var game in game_manager.games)
                 {
-                    IemTeamGame teamgame = (IemTeamGame)game;
-                    messages.Add(" - teams are:");
-                    foreach (IemTeam iemTeam in teamgame.Teams.Values)
-                    {
-                        messages.Add("---* " + iemTeam.Name + " (" + iemTeam.State + ")" + ":");
+                    var messages = new List<string>();
+                    messages.Add("active game: " + game.Name);
+                    messages.Add(" - status: " +
+                                  game.CurrentState);
+                    messages.Add(" - type: " +
+                                  game.GetType());
 
-                        foreach (IemPlayer iemPlayer in iemTeam.Players.Values)
+                    if (game.CurrentState != IemUtils.State.Before)
+                        messages.Add(" - started: " +
+                                  game.StartedTime);
+
+                    if (game.CurrentState == IemUtils.State.Complete ||
+                        game.CurrentState == IemUtils.State.Cancelled)
+                        messages.Add(" - ended: " +
+                                  game.EndedTime);
+
+                    if (game is IemTeamGame)
+                    {
+                        IemTeamGame teamgame = (IemTeamGame)game;
+                        messages.Add(" - teams are:");
+                        foreach (IemTeam iemTeam in teamgame.Teams.Values)
                         {
-                            messages.Add("---*--# " + iemPlayer.PlayerId +
-                                ":" + iemPlayer.Name + " (" + iemPlayer.PlayerState + ")");
+                            messages.Add("---* " + iemTeam.Name + " (" + iemTeam.State + ")" + ":");
+
+                            foreach (IemPlayer iemPlayer in iemTeam.Players.Values)
+                            {
+                                messages.Add("---*--# " + iemPlayer.PlayerId +
+                                    ":" + iemPlayer.Name + " (" + iemPlayer.PlayerState + ")");
+                            }
                         }
                     }
-                }
-                messages.Add("");
+                    string buff = "(";
+                    foreach (IemPlayer iemPlayer in game.Players.Values)
+                    {
+                        buff += "" +
+                            ":" + iemPlayer.Name + " [" + iemPlayer.PlayerState + "],";
+                    }
+                    messages.Add(buff + ")");
+                    messages.Add("");
 
-                SendConsoleMessage(arg, messages);
+                    SendConsoleMessage(arg, messages);
+                }
             }
         }
 
@@ -593,13 +777,17 @@ namespace Oxide.Plugins
         {
             IemUtils.DLog("find games");
             List<IemUtils.IIemGame> tempGames = new List<IemUtils.IIemGame>();
-            foreach (var game in games)
+
+            foreach (var game_manager in gameManagers.Values)
             {
-                IemUtils.DLog("game name is " + game.Name);
-                IemUtils.DLog("substring is " + substring);
-                if (game.Name.ToLower().StartsWith(
-                    (substring.ToLower())))
-                    tempGames.Add(game);
+                foreach (var game in game_manager.games)
+                {
+                    IemUtils.DLog("game name is " + game.Name);
+                    IemUtils.DLog("substring is " + substring);
+                    if (game.Name.ToLower().StartsWith(
+                        (substring.ToLower())))
+                        tempGames.Add(game);
+                }
             }
             return tempGames;
         }

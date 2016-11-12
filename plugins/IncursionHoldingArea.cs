@@ -10,6 +10,7 @@ using Oxide.Core.Plugins;
 using Oxide.Core.Configuration;
 using Newtonsoft.Json;
 using UnityEngine;
+using System;
 
 namespace Oxide.Plugins
 {
@@ -50,17 +51,18 @@ namespace Oxide.Plugins
 
         void Unload()
         {
-
             foreach (var zone in zonelist)
             {
                 ZoneManager.Call("EraseZone", zone);
             }
-
         }
 
+        float mapSize;
 
         void OnServerInitialized()
         {
+
+            mapSize = TerrainMeta.Size.x;
             DestroyAllSpheres();
             //CloseDoors();
         }
@@ -102,30 +104,31 @@ namespace Oxide.Plugins
             }
         }
 
-        int multiplier = 100;
-        int multicount = 1;
+
+
 
         public class TeamSelectLobby : HoldingArea
         {
             public IemObjectPlacement.CopyPastePlacement partition;
-            IemGameBase.IemTeamGame teamGame;
+            IemGameBase.IemTeamGame teamGame;   
 
             List<string> zonelist = new List<string>();
             List<BaseEntity> spheres = new List<BaseEntity>();
 
             public TeamSelectLobby(string copypastefile, IemGameBase.IemTeamGame newTeamGame)
             {
-                teamGame = newTeamGame;
-                me.multicount += 1;
-                int x = -120 + (me.multicount * me.multiplier);
-                int y = 136;
-                int z = -266 + (me.multicount * me.multiplier);
-                location = new Vector3(x, y, z);
+                teamGame = newTeamGame; 
+                
+                location = me.IemUtils.NextFreeLocation();
+
+                me.Puts("yield new vector " + location);
+
+                //location = new Vector3(x, y, z);
                 Vector3 centre_location = new Vector3(location.x - 7, location.y, location.z - 2);
 
 
                 partition = new IemObjectPlacement.CopyPastePlacement(
-                    copypastefile, new Vector3(x, y, z));
+                    copypastefile, location);
                 CreateZoneForLobby();
 
                 int i = 0;
@@ -133,8 +136,8 @@ namespace Oxide.Plugins
                 {
                     //  me.Puts("centre loc is " + centre_location);
                     // me.Puts("loc is " + locs[i]);
-                    IemUtils.CreateZone("team_" + team.Value.GetGuid(),
-                        locs[i] + centre_location, 6);
+                    spheres.Add(IemUtils.CreateZone("team_" + team.Value.GetGuid(),
+                        locs[i] + centre_location, 6));
 
                     zonelist.Add("zone_team_" + team.Value.GetGuid());
                     me.zonelist.Add("zone_team_" + team.Value.GetGuid());
@@ -143,6 +146,24 @@ namespace Oxide.Plugins
                 }
                 PlayerEnteredZone += PlayerEnteredTeamZone;
 
+            }
+
+            public void OpenDoors()
+            {
+                List<Door> doors = IemUtils.FindComponentsNearToLocation<Door>(location, 50);
+                foreach (var door in doors)
+                {
+                    door.SetFlag(BaseEntity.Flags.Open, true);
+                }
+            }
+
+            public void CloseDoors()
+            {
+                List<Door> doors = IemUtils.FindComponentsNearToLocation<Door>(location, 50);
+                foreach (var door in doors)
+                {
+                    door.SetFlag(BaseEntity.Flags.Open, false);
+                }
             }
 
             void PlayerEnteredTeamZone(string ZoneID, BasePlayer player)
@@ -171,7 +192,7 @@ namespace Oxide.Plugins
                         if (team != null && iemplayer != null)
                         {
                             team.AddPlayer((IemUtils.IIemTeamPlayer)iemplayer);
-                            IemUI.ShowTeamUiForPlayer(player, teamGame);
+                            IemUI.UpdateUiForPlayers(teamGame);
                             me.Puts("can game start " + teamGame.CanStart());
                             if (teamGame.CanStart())
                             {
@@ -224,11 +245,16 @@ namespace Oxide.Plugins
 
                     if (sphere.prefabID == prefabID)
                     {
-                        // Puts("found entity with prefabID "
-                        //          + entity.prefabID.ToString());
+                         me.Puts("found entity with prefabID "
+                                  + sphere.prefabID.ToString());
 
                         sphere.KillMessage();
-                        //entity.Kill ();
+                        //entity.Kill (); 
+                    }else
+                    {
+                        me.Puts("found entity with other prefabID "
+                                 + sphere.prefabID.ToString());
+
                     }
 
                 }
@@ -255,18 +281,18 @@ namespace Oxide.Plugins
                     "leave_message", "",
                     "killsleepers", "true",
                     "nosuicide", "false",
-                    //"undestr", "true",nosuicide
+                    "undestr", "true",
                     "nobuild", "true",
                     "nodecay", "true",
-                    //"nocorpse", "true",
+                    "nocorpse", "true",
                     "nogather", "true",
                     "noplayerloot", "true",
-                    //"nowounded", "true",
+                    "nowounded", "true",
                     "nodrown", "true",
                     "nostability", "true",
                     "noupgrade", "true",
-                    //"nobleed", "true",
-                    //"pvpgod", "true",
+                    "nobleed", "true",
+                    "pvpgod", "true",
                     "nodeploy", "true"
                     }, location);
 
@@ -367,23 +393,23 @@ namespace Oxide.Plugins
             //CloseDoors();
         }
 
-        bool CanUseDoor(BasePlayer player, BaseLock door)
+        bool? CanUseDoor(BasePlayer player, BaseLock door)
         {
             Puts("CanUseDoor works!");
             Puts("BaseLock is " + door.GetInstanceID().ToString());
             if (door.GetInstanceID().Equals(-267990) || door.GetInstanceID().Equals(-267932))
             {
                 Puts("is blue team keylock");
-                //return true;
+                return true;
             }
 
             if (door.GetInstanceID().Equals(-268258) || door.GetInstanceID().Equals(-268200))
             {
                 Puts("is red team keylock");
-                //return true;
+                return true;
             }
 
-            return true;
+            return null;
         }
 
 
