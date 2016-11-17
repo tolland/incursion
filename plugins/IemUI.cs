@@ -22,7 +22,7 @@ namespace Oxide.Plugins
         static IemUI iemUI;
         static IemUI me;
 
-        private static List<string> guiList = new List<string>();
+        public static List<string> guiList = new List<string>();
 
         #endregion
 
@@ -205,8 +205,10 @@ namespace Oxide.Plugins
                         },
                         new CuiRectTransformComponent
                         {
-                            AnchorMin = "0.7 0.65",
-                            AnchorMax =  "0.9 0.85"
+                            AnchorMin = "0.22 0.895",
+                            AnchorMax =  "0.78 0.945"
+                            //AnchorMin = "0.7 0.65",
+                            //AnchorMax =  "0.9 0.85"
                         }
                     }
             };
@@ -258,6 +260,50 @@ namespace Oxide.Plugins
 
         }
 
+        public static void CreateRightFadeout(BasePlayer player, string message)
+        {
+            string ARENA = $"{message}";
+            IemUtils.DLog(message);
+            string gui = "CreateRightFadeout";
+            guiList.Add(gui);
+
+            CuiHelper.DestroyUi(player, gui);
+
+            var elements = new CuiElementContainer();
+            CuiElement textElement = new CuiElement
+            {
+                Name = gui,
+                Parent = "Hud.Under",
+                FadeOut = 5,
+                Components =
+                    {
+                        new CuiTextComponent
+                        {
+                            Text = $"<color=#cc0000>{message}</color>",
+                            FontSize = 22,
+                            Align = TextAnchor.UpperLeft,
+                            //FadeIn = 5
+                        },
+                        new CuiOutlineComponent
+                        {
+                            Distance = "1.0 1.0",
+                            Color = "1.0 1.0 1.0 1.0"
+                        },
+                        new CuiRectTransformComponent
+                        {
+                            AnchorMin = "0.80 0.35",
+                            AnchorMax =  "1 0.9"
+                        }
+                    }
+            };
+            elements.Add(textElement);
+            CuiHelper.AddUi(player, elements);
+            me.timer.Once(5f, () =>
+            {
+                CuiHelper.DestroyUi(player, gui);
+            });
+        }
+
 
         public static void CreateGameBanner2(BasePlayer player, string message)
         {
@@ -297,7 +343,6 @@ namespace Oxide.Plugins
             };
             elements.Add(textElement);
             CuiHelper.AddUi(player, elements);
-
         }
 
         public static void UpdateGameStatusBanner(string message, IemGameBase.IemGame game)
@@ -1029,6 +1074,7 @@ namespace Oxide.Plugins
                     if (confirms.ContainsKey(arg.Player().UserIDString))
                     {
                         confirms[arg.Player().UserIDString].confirmMethod();
+                        confirms.Remove(arg.Player().UserIDString);
                     }
 
                     break;
@@ -1041,6 +1087,7 @@ namespace Oxide.Plugins
                     if (confirms.ContainsKey(arg.Player().UserIDString))
                     {
                         confirms[arg.Player().UserIDString].cancelMethod();
+                        confirms.Remove(arg.Player().UserIDString);
                     }
                     break;
             }

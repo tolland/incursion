@@ -671,8 +671,10 @@ namespace Oxide.Plugins
         // Loaded()
         // Called when the plugin is loaded
         /////////////////////////////////////////
+        static ZoneManager me;
         private void Loaded()
         {
+            me = this;
             //Puts("ZoneManager loaded: {0}", GetHashCode());
             ZoneManagerData = Interface.Oxide.DataFileSystem.GetFile("ZoneManager");
             ZoneManagerData.Settings.Converters = new JsonConverter[] { new StringEnumConverter(), new UnityVector3Converter(), };
@@ -1806,13 +1808,36 @@ namespace Oxide.Plugins
 
         private static void AttractPlayer(Zone zone, BasePlayer player)
         {
+            me.Puts("attracting player");
             float dist;
             if (zone.Info.Size != Vector3.zero)
                 dist = zone.Info.Size.x > zone.Info.Size.z ? zone.Info.Size.x : zone.Info.Size.z;
             else
                 dist = zone.Info.Radius;
-            var newPos = zone.transform.position + (player.transform.position - zone.transform.position).normalized * (dist - 5f);
+
+            me.Puts("zone pos is " + zone.transform.position);
+            me.Puts("player pos is " + player.transform.position);
+
+            var newPos = zone.transform.position 
+                + (player.transform.position - zone.transform.position).normalized * (dist - 5f);
+
+            me.Puts("new pos is " + newPos);
+
             newPos.y = TerrainMeta.HeightMap.GetHeight(newPos);
+
+            me.Puts("new pos is " + newPos);
+
+            var newdist = Vector3.Distance(zone.transform.position, newPos);
+
+            me.Puts("distance is "+ newdist);
+
+            //if new location is further than radius away from zone centre
+            // then we might as well go back to the zone loc
+            if(newdist> dist)
+            {
+                newPos = zone.transform.position;
+            }
+
             player.MovePosition(newPos);
             player.ClientRPCPlayer(null, player, "ForcePositionTo", player.transform.position);
             player.TransformChanged();

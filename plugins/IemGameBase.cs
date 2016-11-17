@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Oxide.Core;
 using UnityEngine;
+using Oxide.Game.Rust.Cui;
 
 namespace Oxide.Plugins
 {
@@ -40,9 +41,9 @@ namespace Oxide.Plugins
             gm = new GameManager();
             IemGameBase.RegisterGameManager(gm);
             IemUtils.LogL("IemGame: Loaded complete");
+            me.rust.RunServerCommand("env.time", "12");
             timer.Every(300, () =>
             {
-
                 me.rust.RunServerCommand("env.time", "12");
             });
 
@@ -79,7 +80,7 @@ namespace Oxide.Plugins
                     || game.CurrentState == IemUtils.State.Running
                     || game.CurrentState == IemUtils.State.Paused)
                 {
-                    game.RestoreBasePlayers();
+                    game.CancelGame();
                 }
             }
             //IemUtils.DLog("unregistering game type" + typeof(IemGame));
@@ -98,6 +99,11 @@ namespace Oxide.Plugins
 
         public static void StartFromMenu(BasePlayer player, string game)
         {
+            var newgame = gameManagers[game].SendPlayerToGameManager(player, "Easy");
+        }
+
+        public static void StartFromMenu(BasePlayer player, string game, string levelname)
+        {
             //foreach (var currentgame in games)
             //{
             //    if (currentgame.Players.ContainsKey(player.UserIDString))
@@ -110,15 +116,20 @@ namespace Oxide.Plugins
             //        }
             //    }
             //}
-
-
-            var newgame = gameManagers[game].SendPlayerToGameManager(player);
+            var newgame = gameManagers[game].SendPlayerToGameManager(player, levelname);
             //newgame.StartGame();
         }
 
         #endregion
 
         #region game classes
+
+        public class DifficultyMode
+        {
+            public string Description { get; set; }
+            public string Name { get; set; }
+            public List<GameLevel> GameLevels { get; set; }
+        }
 
         public class GameManager
         {
@@ -127,7 +138,10 @@ namespace Oxide.Plugins
             public string Description { get; set; }
             public string TileImgUrl { get; set; }
             public bool Enabled { get; set; }
-
+            public bool HasDifficultyModes { get; set; }
+            public Dictionary<string, IemGameBase.DifficultyMode> difficultyModes { get; set; }
+            public bool HasStats { get; set; }
+            public bool HasGameStats { get; set; }
 
             public List<IemGame> games
                 = new List<IemGame>();
@@ -142,12 +156,13 @@ namespace Oxide.Plugins
                     "should go.\n" +
                     "and you can write some stuff, and put it here.\n" +
                     "more text more text <color=red>text in red</color>";
-
-
+                difficultyModes = new Dictionary<string, IemGameBase.DifficultyMode>();
+                HasDifficultyModes = false;
+                HasGameStats = false;
             }
 
             // player who is requesting the game, if its a solo, individual game
-            public virtual IemGame SendPlayerToGameManager(BasePlayer player)
+            public virtual IemGame SendPlayerToGameManager(BasePlayer player, string level = null)
             {
                 IemGame currentGame = null;
                 foreach (IemGameBase.IemGame game in games)
@@ -196,7 +211,7 @@ namespace Oxide.Plugins
                 if (currentGame == null)
                 {
                     //get a new game from the GM implementation
-                    currentGame = CreateGame(player);
+                    currentGame = CreateGame(player, level);
                     RegisterGame(currentGame);
                 }
                 return currentGame;
@@ -207,8 +222,18 @@ namespace Oxide.Plugins
             /// </summary>
             /// <param name="player"></param>
             /// <returns></returns>
-            public virtual IemGame CreateGame(BasePlayer player)
+            //        public virtual IemGame CreateGame(BasePlayer player)
+            //        {
+            //            throw new Exception("not call this method in base CreateGame(" +
+            //"BasePlayer player)");
+            //            return null;
+            //        }
+
+            public virtual IemGame CreateGame(BasePlayer player,
+                string level = null)
             {
+                throw new Exception("not call this method in base CreateGame(" +
+                    "BasePlayer player,                 string level)");
                 return null;
             }
 
@@ -230,6 +255,9 @@ namespace Oxide.Plugins
             public Dictionary<string, IemUtils.IIemPlayer> Players { get; set; }
             public int MaxPlayers { get; set; }
             public int MinPlayers { get; set; }
+            public bool HasDifficultyLevels { get; set; }
+            public string difficultyLevel = "Easy";
+            public double totalTime = 0;
 
             //track gamezones
             public Dictionary<string, IemUtils.GameZone> gamezones = new Dictionary<string, IemUtils.GameZone>();
@@ -240,6 +268,16 @@ namespace Oxide.Plugins
                            name,
                            new IemUtils.GameZone(name,
                            location, 2));
+            }
+
+            public void RemoveGameZone(string name)
+            {
+                if (gamezones.ContainsKey(name))
+                {
+                    gamezones[name].Remove();
+                    gamezones.Remove(name);
+                }
+
             }
 
             Guid _guid;
@@ -293,18 +331,34 @@ namespace Oxide.Plugins
                 return StartGame();
             }
 
+            /// <summary>
+            /// This is probably misleadingly named
+            /// basically, EndGame is used to mark the game complete in terms
+            /// of stats and tracking for the Interfafce
+            /// </summary>
+            /// <returns></returns>
             public virtual bool EndGame()
             {
                 CurrentState = IemUtils.State.Complete;
                 EndedTime = DateTime.Now;
                 CleanUp();
-                Interface.Oxide.CallHook("OnGameEnded", this);
+
+                foreach (var player in Players.Values)
+                {
+                    Interface.Oxide.CallHook("OnGameEnded", BasePlayer.Find(player.PlayerId), this);
+                }
+
                 return true;
             }
 
+            /// <summary>
+            /// this method is used to send a signal to the implementation
+            /// to wrap things up.
+            /// </summary>
+            /// <returns></returns>
             public virtual bool CancelGame()
             {
-                //IemUtils.DLog("calling CancelGame in IemGame");
+                IemUtils.DLog("calling CancelGame in IemGame");
                 CurrentState = IemUtils.State.Cancelled;
                 CleanUp();
                 Interface.Oxide.CallHook("OnGameCancelled", this);
@@ -320,10 +374,19 @@ namespace Oxide.Plugins
             public virtual bool CleanUp()
             {
                 //CurrentState = IemUtils.State.Cancelled;
-                foreach(var gamezone in gamezones.Values)
+                foreach (var gamezone in gamezones.Values)
                 {
                     gamezone.Remove();
                 }
+                foreach (var iemplayer in Players.Values)
+                {
+                    CuiHelper.DestroyUi(BasePlayer.Find(iemplayer.PlayerId), "ConfirmCancel");
+                    if (IemUI.confirms.ContainsKey(iemplayer.PlayerId))
+                    {
+                        IemUI.confirms.Remove(iemplayer.PlayerId);
+                    }
+                }
+
                 return true;
             }
 
@@ -333,7 +396,17 @@ namespace Oxide.Plugins
                 {
                     IemUtils.TeleportPlayerPosition(BasePlayer.Find(player.PlayerId),
                         player.PreviousLocation);
+                    me.IemUtils.RestoreInventory(BasePlayer.Find(player.PlayerId), GetGuid());
                 }
+            }
+
+
+            public IemUtils.IIemPlayer GetIemPlayerById(string id)
+            {
+                if (Players.ContainsKey(id))
+                    return (IemUtils.IIemPlayer)Players[id];
+
+                return null;
             }
         }
 
@@ -341,7 +414,7 @@ namespace Oxide.Plugins
         {
             public BasePlayer player;
             public string UserIDString;
-            public IemGameBase.IemPlayer iemPlayer;
+            public IemPlayer iemPlayer;
 
             public IemSoloGame(BasePlayer newPlayer)
             {
@@ -685,14 +758,153 @@ namespace Oxide.Plugins
                 PlayerState = IemUtils.PlayerState.Alive;
                 PreviousLocation = player.transform.position;
                 PreviousRotation = player.GetNetworkRotation();
-
-
             }
 
             //TODO this is stupid
             public BasePlayer AsBasePlayer()
             {
                 return BasePlayer.FindByID(ulong.Parse(PlayerId));
+            }
+        }
+
+        #endregion
+
+        #region Game Level Classes
+
+
+        public class GameLevelAccuracy
+        {
+            public IemGame Game { get; set; }
+            public int ShotsFired { get; set; }
+            public int ShotsHit { get; set; }
+            public int BullsEyes { get; set; }
+            private GameLevel gameLevel;
+
+            public GameLevelAccuracy(GameLevel gameLevel)
+            {
+                this.gameLevel = gameLevel;
+            }
+
+            public double GetAccuracy()
+            {
+                return ((float)ShotsHit / (float)ShotsFired);
+            }
+
+            public double GetShotRate()
+            {
+                return (float)ShotsFired / gameLevel.LevelTime();
+            }
+
+            public double GetHitRate()
+            {
+                return (float)ShotsHit / gameLevel.LevelTime();
+            }
+
+            public string GetAccuracyAsString()
+            {
+                me.Puts("fired is " + ShotsFired);
+                me.Puts("hit is " + ShotsHit);
+                me.Puts("ratio is " + ((float)ShotsHit / (float)ShotsFired));
+                string percentile = (100 * (float)ShotsHit / (float)ShotsFired).ToString("0.00") + " %\n";
+                if (gameLevel.Ended)
+                {
+                    percentile += "shots/sec " +
+                        ((float)ShotsFired / gameLevel.LevelTime()).ToString("0.00") + "\n";
+                    percentile += "hits/sec "
+                        + ((float)ShotsHit / gameLevel.LevelTime()).ToString("0.00")
+                        + "\n";
+                    percentile += "level time "
+                        + (gameLevel.LevelTime()).ToString("0.00")
+                        + " \n";
+                }
+
+                return percentile;
+            }
+        }
+
+
+        public class GameLevelDefinition
+        {
+
+        }
+
+        public class GameLevel
+        {
+            public IemGame Game { get; set; }
+            public BasePlayer Player { get; set; }
+            public GameLevelAccuracy accuracy { get; set; }
+            public int Timer { get; set; }
+            private bool started = false;
+            private bool ended = false;
+            private DateTime startTime;
+            public DateTime StartTime { get { return startTime; } }
+            private DateTime endTime;
+            public DateTime EndTime { get { return endTime; } }
+            public bool Started { get { return started; } }
+            public bool Ended { get { return ended; } }
+
+            Guid _guid;
+
+
+            public Guid GetGuid()
+            {
+                return _guid;
+            }
+
+
+            public GameLevel()
+            {
+                _guid = Guid.NewGuid();
+                accuracy = new GameLevelAccuracy(this);
+            }
+
+            public bool Start()
+            {
+                if (started || ended)
+                {
+                    return false;
+                }
+                else
+                {
+                    started = true;
+                    startTime = DateTime.Now;
+                    //       me.Puts("in GameLevel Start(), time is " + startTime);
+                    return true;
+                }
+            }
+
+            public bool End()
+            {
+                if (started && !ended)
+                {
+                    endTime = DateTime.Now;
+                    ended = true;
+                    //      me.Puts("in GameLevel End(), endtime is " + endTime);
+                    //     me.Puts("in GameLevel End(), startTime is " + startTime);
+                    Game.totalTime += LevelTime();
+                    //     me.Puts("LevelTime(), time is " + LevelTime());
+                    Interface.Oxide.CallHook("OnGameLevelEnded", this);
+                    return ended;
+                }
+                else
+                {
+                    return false;
+                }
+            }
+
+            public void Reset()
+            {
+                accuracy = new GameLevelAccuracy(this);
+                // endTime = null;
+                started = false;
+                ended = false;
+                me.Puts("in GameLevel Reset(), resetting started and ended");
+
+            }
+
+            public double LevelTime()
+            {
+                return (EndTime - StartTime).TotalSeconds;
             }
         }
 
@@ -710,6 +922,34 @@ namespace Oxide.Plugins
             //    }
         }
 
+        public static IemGame FindActiveGameForPlayer(BasePlayer player)
+        {
+            foreach (var game_manager in gameManagers.Values)
+            {
+                foreach (var game in game_manager.games)
+                {
+                    if (game.CurrentState == IemUtils.State.Before
+                        || game.CurrentState == IemUtils.State.Paused
+                        || game.CurrentState == IemUtils.State.Running)
+                    {
+                        foreach (IemPlayer iemPlayer in game.Players.Values)
+                        {
+                            if (iemPlayer.AsBasePlayer() == player)
+                            {
+                                //maybe want to do something different if the player is dead
+                                // and is out of the running game
+                                if (iemPlayer.PlayerState == IemUtils.PlayerState.Dead)
+                                {
+                                }
+                                return game;
+                            }
+
+                        }
+                    }
+                }
+            }
+            return null;
+        }
 
         void ListActiveGames(ConsoleSystem.Arg arg)
         {
@@ -793,7 +1033,6 @@ namespace Oxide.Plugins
         }
 
         #endregion
-
 
         #region console
 

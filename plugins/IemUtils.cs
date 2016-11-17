@@ -5,11 +5,11 @@ using System.Collections.Generic;
 using Oxide.Core.Plugins;
 using UnityEngine;
 using Random = System.Random;
-using System.IO;
 using ConVar;
-using Oxide.Core;
 using Physics = UnityEngine.Physics;
 using Rust;
+using Oxide.Game.Rust.Cui;
+using System.Linq;
 
 namespace Oxide.Plugins
 {
@@ -21,9 +21,7 @@ namespace Oxide.Plugins
         [PluginReference]
         Plugin ZoneManager;
 
-
-
-
+        public static List<string> guiList = new List<string>();
 
         static Game.Rust.Libraries.Rust rust = GetLibrary<Game.Rust.Libraries.Rust>();
         static FieldInfo monumentsField = typeof(TerrainPath).GetField("Monuments",
@@ -38,19 +36,48 @@ namespace Oxide.Plugins
         {
             iemUtils = this;
             me = this;
-            LogL("");
-            LogL("Init in iemutils");
+            //LogL("");
+            //LogL("Init in iemutils");
         }
 
 
         void Loaded()
         {
-            LogL("iemutils: server loaded");
+            //LogL("iemutils: server loaded");
         }
 
         void OnServerInitialized()
         {
-            LogL("iemutils: server initialized");
+            //LogL("iemutils: server initialized");
+            RemoveUIs();
+        }
+        void Unload()
+        {
+            RemoveUIs();
+            //IemUtils.LogL("IemUI: Unload complete");
+
+        }
+
+        #endregion
+
+        #region clean up
+
+        public static void RemoveUIs()
+        {
+            List<BasePlayer> activePlayers = BasePlayer.activePlayerList;
+
+            foreach (BasePlayer player in activePlayers)
+            {
+                CleanUpGui(player);
+            }
+        }
+
+        public static void CleanUpGui(BasePlayer player)
+        {
+            foreach (string gui in guiList)
+            {
+                CuiHelper.DestroyUi(player, gui);
+            }
         }
 
         #endregion
@@ -109,6 +136,7 @@ namespace Oxide.Plugins
         void OnPlayerDisconnected(BasePlayer player)
         {
             teleporting.Remove(player.userID);
+            GameTimer.Remove(player);
         }
 
 
@@ -179,9 +207,10 @@ namespace Oxide.Plugins
         public static void DrawChatMessage(BasePlayer onlinePlayer, BaseEntity entity, string message)
         {
             float distanceBetween = Vector3.Distance(entity.transform.position, onlinePlayer.transform.position);
-
+            me.Puts("distance is " + distanceBetween);
             if (distanceBetween <= 50)
             {
+                me.Puts("drawing " + message + " at " + (entity.transform.position + new Vector3(0, 1.9f, 0)));
                 string lastMessage = message;
                 Color messageColor = new Color(1, 1, 1, 1);
 
@@ -215,7 +244,6 @@ namespace Oxide.Plugins
         }
 
         #endregion
-
 
         void DeleteEverything()
         {
@@ -297,6 +325,16 @@ namespace Oxide.Plugins
             //iemUtils.Puts(message);
         }
 
+        public static string GetTimeFromSeconds(double totalTime)
+        {
+            //var ticks = totalTime * 10000 * 1000;
+            var span = TimeSpan.FromSeconds(totalTime);
+            return string.Format("{0}:{1:00}.{2:000}",
+                            (int)span.TotalMinutes,
+                            span.Seconds,
+                            span.Milliseconds);
+        }
+
         private static string prefix;
         public static void SendMessage(BasePlayer player, string message, params object[] args)
         {
@@ -330,9 +368,8 @@ namespace Oxide.Plugins
 
             public GameZone(string name, Vector3 location, int radius)
             {
-                iemUtils.Puts("creating zone at " + location);
-
-                //ZoneManager.Call("EraseZone", "zone_" + name);
+                //    iemUtils.Puts("creating zone at " + location + " with radius " + radius);
+                //    iemUtils.Puts("zone name" + name);
 
                 iemUtils.ZoneManager.Call("CreateOrUpdateZone",
                     "zone_" + name,
@@ -347,27 +384,22 @@ namespace Oxide.Plugins
                     }, location);
 
                 this.location = location;
-                zoneid = name;
+                zoneid = "zone_" + name;
                 sphere = CreateSphere(location, (radius * 2) + 1);
             }
 
             public void Remove()
             {
+                //    me.Puts("removing zone id " + zoneid);
                 me.ZoneManager.Call("EraseZone", zoneid);
                 sphere.KillMessage();
             }
-
         }
 
         public static GameZone CreateGameZone(string name, Vector3 location, int radius)
         {
 
-
-
-
-
             //CreateSphere(location, (radius * 2) + 1);
-
             return null;
         }
 
@@ -411,8 +443,80 @@ namespace Oxide.Plugins
 
         }
 
-        #endregion
 
+        public class ReturnZone
+        {
+            string zoneid;
+            BaseEntity sphere;
+            Vector3 location;
+            HashSet<BasePlayer> playersinzone = new HashSet<BasePlayer>();
+
+            Guid _guid;
+
+            public Guid GetGuid()
+            {
+                return _guid;
+            }
+
+            public ReturnZone(Vector3 location, BasePlayer player = null, int radius = 50)
+            {
+                _guid = Guid.NewGuid();
+                zoneid = GetGuid().ToString();
+
+                iemUtils.ZoneManager.Call("CreateOrUpdateZone",
+                    zoneid,
+                    new string[]
+                    {
+                    "radius", radius.ToString(),
+                    "autolights", "false",
+                    "eject", "false",
+                    "enter_message", "",
+                    "leave_message", "",
+                    "killsleepers", "false"
+                    }, location);
+
+
+                this.location = location;
+                sphere = CreateSphere(location, (radius * 2.0f) + 1);
+
+                if (player != null)
+                {
+                    AddPlayerToKeepin(player);
+                }
+            }
+
+            public void AddPlayerToKeepin(BasePlayer player)
+            {
+                playersinzone.Add(player);
+                iemUtils.ZoneManager.Call("AddPlayerToZoneKeepinlist",
+                        zoneid, player);
+            }
+
+            public void RemovePlayerFromKeepin(BasePlayer player)
+            {
+                if (playersinzone.Contains(player))
+                {
+                //    me.Puts("removing player from zone " + zoneid);
+                    iemUtils.ZoneManager.Call("RemovePlayerFromZoneKeepinlist",
+                            zoneid, player);
+                }
+            }
+
+            public void Destroy()
+            {
+
+               // me.Puts("destroying zone " + zoneid);
+                foreach (var player in playersinzone)
+                {
+                    RemovePlayerFromKeepin(player);
+                }
+               // me.Puts("erasing zone " + zoneid);
+                me.ZoneManager.Call("EraseZone", zoneid);
+                sphere.KillMessage();
+            }
+        }
+
+        #endregion
 
         #region finding stuff
 
@@ -424,10 +528,11 @@ namespace Oxide.Plugins
         static int collisionLayer = LayerMask.GetMask("Construction", "Construction Trigger",
             "Trigger", "Deployed", "Default");
 
-
         public static List<T> FindComponentsNearToLocation<T>(Vector3 location, int radius)
         {
-            List<T> components = new List<T>();
+            //List<T> components = new List<T>();
+
+            HashSet<T> components = new HashSet<T>();
 
             foreach (Collider col in Physics.OverlapSphere(location, radius))
             {
@@ -435,7 +540,7 @@ namespace Oxide.Plugins
                 components.Add(col.GetComponentInParent<T>());
             }
 
-            return components;
+            return components.ToList();
         }
 
         // TODO maybe find the nearest collider?
@@ -469,7 +574,6 @@ namespace Oxide.Plugins
                     dist = tempdist;
                     component = col.GetComponentInParent<T>();
                 }
-
 
             }
             if (component != null)
@@ -644,6 +748,43 @@ namespace Oxide.Plugins
 
         #endregion
 
+        #region entity manipulations
+
+        //oid SwapIfGreater<T>(ref T lhs, ref T rhs) where T : System.IComparable<T>
+
+        public static int SwitchTypesToTarget<T>(Vector3 location, int radius = 50) where T : BaseEntity
+        {
+            int count = 0;
+            List<T> components = IemUtils.FindComponentsNearToLocation<T>(
+                location, radius);
+            //me.Puts("baseovens is not null, count is " + components.Count);
+            foreach (var component in components)
+            {
+                //me.Puts("object is located at " + component.transform.position);
+                var pos = component.transform.position;
+                //pos = new Vector3(pos.x, pos.y, pos.z); 
+                var rot = component.transform.rotation;
+                component.Kill(BaseNetworkable.DestroyMode.None);
+                var entity = GameManager.server.CreateEntity(
+                    "assets/prefabs/deployable/reactive target/reactivetarget_deployed.prefab",
+                    pos, rot, true);
+                if (entity != null)
+                {
+                    entity.transform.position = pos;
+                    entity.transform.rotation = rot;
+                    // entity.SendMessage("SetDeployedBy", player, SendMessageOptions.DontRequireReceiver);
+
+
+                    entity.skinID = 0;
+                    entity.Spawn();
+                    count++;
+                }
+            }
+
+            return count;
+        }
+
+        #endregion
 
         #region geo stuff
 
@@ -753,6 +894,30 @@ namespace Oxide.Plugins
             me.teleporting.Remove(player.userID);
         }
 
+        public static bool MovePlayerToTeamLocation(BasePlayer player, Vector3 location)
+        {
+
+            IemUtils.GLog("moving players to game location: " + location);
+
+            if (player.IsSleeping())
+            {
+                player.EndSleeping();
+            }
+            if (player.IsWounded())
+            {
+                IemUtils.SetMetabolismValues(player);
+                player.SetPlayerFlag(BasePlayer.PlayerFlags.Wounded, false);
+                player.CancelInvoke("WoundingTick");
+            }
+
+            if (!IemUtils.CheckPointNearToLocation(player.transform.position, location, 2))
+                //IemUtils.MovePlayerTo(player, location);
+                IemUtils.TeleportPlayerPosition(player, location);
+
+            return true;
+        }
+
+
         //TODO implement this with SQr values?
         public static bool CheckPointNearToLocation(Vector3 location1, Vector3 location2, float radius)
         {
@@ -764,6 +929,7 @@ namespace Oxide.Plugins
                 return true;
             return false;
         }
+
 
         static Random random = new Random();
 
@@ -798,7 +964,7 @@ namespace Oxide.Plugins
         #region scheduled event global
 
         public Dictionary<Guid, ScheduledEvent> scheduledEvents =
-    new Dictionary<Guid, ScheduledEvent>();
+        new Dictionary<Guid, ScheduledEvent>();
 
         public class ScheduledEvent
         {
@@ -1008,6 +1174,8 @@ namespace Oxide.Plugins
             DateTime EndedTime { get; set; }
             //TODO might need to populate this from the database
             Guid GetGuid();
+            bool HasDifficultyLevels { get; set; }
+            //bool HasVariations { get; set; }
 
             Dictionary<string, IemUtils.IIemPlayer> Players { get; set; }
             //List<IIemPlayer> GetPlayers();
@@ -1255,6 +1423,210 @@ namespace Oxide.Plugins
                 }
 
             return item;
+        }
+
+        #endregion
+
+        #region game timers/action wrappers
+
+        public class GameTimer
+        {
+
+            private static Dictionary<string, GameTimer> _instances = new Dictionary<string, GameTimer>();
+
+            public static GameTimer Instance(BasePlayer player)
+            {
+                if (_instances.ContainsKey(player.UserIDString))
+                {
+                    return _instances[player.UserIDString];
+                }
+                else
+                {
+                    GameTimer gametimer = new GameTimer();
+                    gametimer.player = player;
+                    _instances[player.UserIDString] = gametimer;
+                    return gametimer;
+                }
+            }
+
+            public static void Remove(BasePlayer player)
+            {
+                if (_instances.ContainsKey(player.UserIDString))
+                {
+                    _instances[player.UserIDString].callback = null;
+                    _instances.Remove(player.UserIDString);
+                }
+            }
+
+
+            static void setTimer()
+            {
+                me.timer.Once(10, () =>
+                {
+
+                });
+            }
+
+            Action callback;
+            Timer timer;
+            Timer ctimer;
+            Timer etimer;
+            float delay;
+            BasePlayer player;
+
+            public static void CreateTimer(BasePlayer player, float delay, Action callback)
+            {
+                GameTimer gt = Instance(player);
+                gt.delay = delay;
+                gt.callback = callback;
+                gt.timer?.Destroy();
+                gt.etimer?.Destroy();
+                gt.ctimer?.Destroy();
+                gt.timer = me.timer.Once(delay, callback);
+
+            }
+
+            public static void CreateTimerPaused(BasePlayer player, float delay, Action callback)
+            {
+                GameTimer gt = Instance(player);
+                // gt.timer = me.timer.Once(10, callback);
+                gt.delay = delay;
+                gt.callback = callback;
+                gt.timer?.Destroy();
+                gt.etimer?.Destroy();
+                gt.ctimer?.Destroy();
+
+                //show the timer, and wait for the signal to start counting
+                CreateGameTimerUI(player, delay);
+            }
+
+            public static void Destroy(BasePlayer player)
+            {
+                GameTimer gt = Instance(player);
+                gt.callback = null;
+                gt.timer?.Destroy();
+                gt.etimer?.Destroy();
+                gt.ctimer?.Destroy();
+                string gui = "GameTimer";
+                CuiHelper.DestroyUi(player, gui);
+            }
+
+            void StartCountdown()
+            {
+                int repeats = (int)Math.Round(delay, 0);
+                int countdown = (int)Math.Round(delay, 0);
+                CreateGameTimerUI(player,
+                delay);
+
+                // start the timer that updates the UI
+                ctimer = me.timer.Repeat(1f, repeats, () =>
+                {
+                    countdown -= 1;
+                    CreateGameTimerUI(player, countdown);
+
+                });
+
+                //start the timer that clears the UI
+                etimer = me.timer.Once(repeats + 1, () =>
+                {
+                    callback = null;
+                    timer?.Destroy();
+                    ctimer?.Destroy();
+                    string gui = "GameTimer";
+                    CuiHelper.DestroyUi(player, gui);
+                });
+            }
+
+            public static void Start(BasePlayer player)
+            {
+                GameTimer gt = Instance(player);
+                gt.timer?.Destroy();
+                gt.timer = me.timer.Once(gt.delay, gt.callback);
+
+                gt.StartCountdown();
+            }
+        }
+
+
+        public static void CreateGameTimerUI(BasePlayer player,
+            float seconds,
+            string message = "remaining: ")
+        {
+
+            float minutes = seconds / 60;
+            float secs = seconds % 60;
+
+            string ARENA = $"{message}";
+            string gui = "GameTimer";
+            guiList.Add(gui);
+
+            CuiHelper.DestroyUi(player, gui);
+            var elements = new CuiElementContainer();
+            CuiElement textElement = new CuiElement
+            {
+                Name = gui,
+                Parent = "Hud.Under",
+                //FadeOut = 10,
+                Components =
+                    {
+                new CuiTextComponent
+                {
+                    Text = $"<color=#cc0000>{message}</color>\n<color=white>{minutes.ToString("00")}:{secs.ToString("00")}</color>",
+                    FontSize = 22,
+                    Align = TextAnchor.UpperLeft,
+                    //FadeIn = 5
+                },
+                        new CuiOutlineComponent
+                        {
+                            Distance = "1.0 1.0",
+                            Color = "0.3 0.3 0.3 0.6"
+                        },
+                        new CuiRectTransformComponent
+                        {
+                            AnchorMin = "0.01 0.90",
+                            AnchorMax = "0.22 0.99"
+                        }
+                    }
+            };
+            elements.Add(textElement);
+            CuiHelper.AddUi(player, elements);
+
+        }
+
+        #endregion
+
+        #region config statics
+
+        private static T GetConfigValue<T>(string category, string setting,
+            T defaultValue, ref bool configChanged, ref Core.Configuration.DynamicConfigFile Config)
+        {
+            var data = Config[category] as Dictionary<string, object>;
+            object value;
+            if (data == null)
+            {
+                data = new Dictionary<string, object>();
+                Config[category] = data;
+                configChanged = true;
+            }
+            if (data.TryGetValue(setting, out value)) return (T)Convert.ChangeType(value, typeof(T));
+            value = defaultValue;
+            data[setting] = value;
+            configChanged = true;
+            return (T)Convert.ChangeType(value, typeof(T));
+        }
+
+        private static void SetConfigValue<T>(string category, string setting, T newValue,
+            ref bool configChanged, ref Core.Configuration.DynamicConfigFile Config)
+        {
+            var data = Config[category] as Dictionary<string, object>;
+            object value;
+            if (data != null && data.TryGetValue(setting, out value))
+            {
+                value = newValue;
+                data[setting] = value;
+                configChanged = true;
+            }
+            //SaveConfig();
         }
 
         #endregion

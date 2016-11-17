@@ -26,31 +26,37 @@
   "Options": {
     "GatherDispenserModifiers": {},
     "GatherResourceModifiers": {
-      "Leather": 10.0,
       "Animal Fat": 10.0,
+      "Charcoal": 10.0,
+      "Crude Oil": 10.0,
+      "Gun Powder": 10.0,
+      "High Quality Metal Ore": 20.0,
+      "Leather": 10.0,
+      "Low Grade Fuel": 10.0,
+      "Metal Fragments": 10.0,
+      "Metal Ore": 10.0,
       "Raw Human Meat": 10.0,
-      "Wood": 20.0,
-      "Metal Ore": 20.0,
-      "Stones": 20.0,
-      "Sulfur": 20.0,
-      "Sulfur Ore": 20.0,
-      "Crude Oil": 20.0,
-      "Low Grade Fuel": 20.0,
-      "Charcoal": 20.0,
-      "Gun Powder": 20.0,
-      "High Quality Metal Ore": 10.0,
-      "Metal Fragments": 10.0
+      "Stones": 10.0,
+      "Sulfur": 10.0,
+      "Sulfur Ore": 10.0,
+      "Wood": 20.0
     },
     "MiningQuarryResourceTickRate": 5.0,
     "PickupResourceModifiers": {
-      "Wood": 10.0,
+      "Cloth": 10.0,
+      "High Quality Metal Ore": 10.0,
+      "Metal Fragments": 10.0,
+      "Metal Ore": 10.0,
       "Stones": 10.0,
       "Sulfur Ore": 10.0,
-      "Metal Ore": 10.0,
-      "High Quality Metal Ore": 10.0,
-      "Metal Fragments": 10.0
+      "Wood": 10.0
     },
-    "QuarryResourceModifiers": {},
+    "QuarryResourceModifiers": {
+      "High Quality Metal Ore": 20.0,
+      "Stones": 20.0,
+      "Metal Ore": 20.0,
+      "Sulfur Ore": 20.0
+    },
     "SurveyResourceModifiers": {}
   },
   "Settings": {
