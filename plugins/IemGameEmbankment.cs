@@ -49,6 +49,7 @@ namespace Oxide.Plugins
         void Init()
         {
             me = this;
+            //LoadConfigValues();
             IemUtils.LogL("IemGameEmbankment: Init complete");
         }
 
@@ -80,20 +81,14 @@ namespace Oxide.Plugins
         void LoadDefaultConfig()
         {
             Config.Clear();
-            Config["Enabled"] = false;
+            Config["GameLevels"] = false;
             Config.Save();
-        }
-
-        void OnGameEnded(IemGameBase.IemGame endedGame)
-        {
-            IemUtils.GLog("Hook called to indicate game ended");
         }
 
         #endregion
 
         #region IemGameEmbankmentGame
 
-         
         public class EMGameManager : IemGameBase.GameManager
         {
             public EMGameManager() : base()
@@ -106,7 +101,8 @@ namespace Oxide.Plugins
             }
 
 
-            public override IemGameBase.IemGame CreateGame(BasePlayer player)
+            public override IemGameBase.IemGame CreateGame(BasePlayer player,
+                string level = null)
             {
                 var newGame = new IemGameEmbankmentGame();
                 newGame.Players[player.UserIDString] = new IemEmbankmentPlayer(player, newGame);
@@ -131,9 +127,9 @@ namespace Oxide.Plugins
         {
             public EmbankStateManager gsm;
             public float GameLobbyWait = 10;
-            public int PartitionWait = 5;
-            public int MainPhaseWait = 5;
-            public int SuddenDeathPhaseWait = 5;
+            public int PartitionWait = 60;
+            public int MainPhaseWait = 60;
+            public int SuddenDeathPhaseWait = 15;
             public IncursionHoldingArea.TeamSelectLobby teamLobby;
 
             public IemGameEmbankmentGame()
@@ -354,7 +350,7 @@ namespace Oxide.Plugins
                 }
             }
 
-            public bool SuddenDeathWounded(BaseCombatEntity entity, HitInfo hitInfo)
+            public object SuddenDeathWounded(BaseCombatEntity entity, HitInfo hitInfo)
             {
                 return false;
             }
@@ -839,6 +835,11 @@ namespace Oxide.Plugins
                         {
                             BasePlayer player = IemUtils.FindPlayerByID(iemPlayer.PlayerId);
                             me.IemUtils?.RestoreInventory(player, gsm.eg.GetGuid());
+
+
+                            IemUtils.MovePlayerToTeamLocation(player,
+                                iemPlayer.PreviousLocation);
+
                         }
                     }
 
@@ -862,15 +863,15 @@ namespace Oxide.Plugins
             IemUtils.SetMetabolismNoNutrition(player);
         }
 
-        static bool NullFunc(BasePlayer entity, HitInfo hitInfo)
+        static object NullFunc(BasePlayer entity, HitInfo hitInfo)
         {
-            return true;
+            return null;
         }
 
-        public delegate bool EntitiesCanBeWounded(BasePlayer player, HitInfo hitInfo);
+        public delegate object EntitiesCanBeWounded(BasePlayer player, HitInfo hitInfo);
         private static EntitiesCanBeWounded EntitiesBeingWounded = NullFunc;
 
-        private bool CanBeWounded(BasePlayer player, HitInfo hitInfo)
+        private object CanBeWounded(BasePlayer player, HitInfo hitInfo)
         {
 
             //if (player == null || hitInfo == null) return true;
@@ -972,6 +973,75 @@ namespace Oxide.Plugins
         }
 
         #endregion
+
+        #region Configuration Data
+        // Do not modify these values because this will not change anything, the values listed below are only used to create
+        // the initial configuration file. If you wish changes to the configuration file you should edit 'GatherManager.json'
+        // which is located in your server's config folder: <drive>:\...\server\<your_server_identity>\oxide\config\
+
+        private bool configChanged;
+        private static readonly Dictionary<string, object> DefaultDifficultyLevels 
+            = new Dictionary<string, object>();
+
+        public Dictionary<string, float> DifficultyLevels { get; private set; }
+
+        private void LoadConfigValues()
+        {
+
+            // Plugin options
+            var difficultyLevels = GetConfigValue("Options", "DifficultyLevels",
+                DefaultDifficultyLevels);
+
+            Puts("here");
+
+            DifficultyLevels = new Dictionary<string, float>();
+            foreach (var entry in difficultyLevels)
+            {
+
+                Puts("here2");
+                float rate;
+                if (!float.TryParse(entry.Value.ToString(), out rate)) continue;
+                DifficultyLevels.Add(entry.Key, rate);
+            }
+
+            if (!configChanged) return;
+            PrintWarning("Configuration file updated.");
+            SaveConfig();
+
+        }
+
+        private T GetConfigValue<T>(string category, string setting, T defaultValue)
+        {
+            var data = Config[category] as Dictionary<string, object>;
+            object value;
+            if (data == null)
+            {
+                data = new Dictionary<string, object>();
+                Config[category] = data;
+                configChanged = true;
+            }
+            if (data.TryGetValue(setting, out value)) return (T)Convert.ChangeType(value, typeof(T));
+            value = defaultValue;
+            data[setting] = value;
+            configChanged = true;
+            return (T)Convert.ChangeType(value, typeof(T));
+        }
+
+        private void SetConfigValue<T>(string category, string setting, T newValue)
+        {
+            var data = Config[category] as Dictionary<string, object>;
+            object value;
+            if (data != null && data.TryGetValue(setting, out value))
+            {
+                value = newValue;
+                data[setting] = value;
+                configChanged = true;
+            }
+            SaveConfig();
+        }
+
+        #endregion
+
     }
 }
 

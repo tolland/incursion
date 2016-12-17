@@ -415,6 +415,8 @@ namespace Oxide.Plugins
 
             private void CheckCollisionEnter(Collider col)
             {
+               // me.Puts("in checkcollision enter");
+
                 if (ZoneManagerPlugin.HasZoneFlag(this, ZoneFlags.NoDecay))
                 {
                     var decayEntity = col.GetComponentInParent<DecayEntity>();
@@ -484,8 +486,21 @@ namespace Oxide.Plugins
                 }
             }
 
+            void OnCollisionEnter(Collision collision)
+            {
+                me.Puts("on collision enter");
+                foreach (ContactPoint contact in collision.contacts)
+                {
+                    Debug.DrawRay(contact.point, contact.normal, Color.white);
+                }
+
+            }
+
             private void OnTriggerEnter(Collider col)
             {
+
+                //me.Puts("in OnTriggerEnter enter"); 
+
                 //Interface.Oxide.LogInfo("Enter {0}: {1}", Info.ID, col.name);
                 var player = col.GetComponentInParent<BasePlayer>();
                 if (player != null)
@@ -865,8 +880,29 @@ namespace Oxide.Plugins
         /////////////////////////////////////////
         private void OnEntityTakeDamage(BaseCombatEntity entity, HitInfo hitinfo)
         {
+
             if (entity == null || entity.GetComponent<ResourceDispenser>() != null) return;
             var player = entity as BasePlayer;
+
+            if (hitinfo.damageTypes.Has(DamageType.Fall))
+            {
+                me.Puts("detected fall damage in teleport, teleport count us " + teleporting.Count);
+                foreach (var teleport in teleporting)
+                {
+                    me.Puts("userid is " + teleport);
+                }
+                if (teleporting.Contains(player.userID))
+                {
+                    me.Puts("splatting fall damage in teleport");
+                    hitinfo.damageTypes = new DamageTypeList();
+                    teleporting.Remove(player.userID);
+                    me.Puts("teleport count 2 is " + me.teleporting.Count);
+
+                }
+            }
+
+
+
             if (player != null)
             {
                 var target = hitinfo.Initiator as BasePlayer;
@@ -1806,8 +1842,14 @@ namespace Oxide.Plugins
             player.SendNetworkUpdateImmediate();
         }
 
+
+        private readonly HashSet<ulong> teleporting = new HashSet<ulong>();
+
+
         private static void AttractPlayer(Zone zone, BasePlayer player)
         {
+
+            me.teleporting.Add(player.userID);
             me.Puts("attracting player");
             float dist;
             if (zone.Info.Size != Vector3.zero)
@@ -1842,6 +1884,12 @@ namespace Oxide.Plugins
             player.ClientRPCPlayer(null, player, "ForcePositionTo", player.transform.position);
             player.TransformChanged();
             player.SendNetworkUpdateImmediate();
+
+            me.timer.Once(3f, () =>
+            {
+                if (me.teleporting.Contains(player.userID))
+                    me.teleporting.Remove(player.userID);
+            });
         }
 
         private static bool isAdmin(BasePlayer player)

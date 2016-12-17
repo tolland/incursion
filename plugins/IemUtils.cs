@@ -11,6 +11,7 @@ using Rust;
 using Oxide.Game.Rust.Cui;
 using System.Linq;
 
+
 namespace Oxide.Plugins
 {
 
@@ -121,6 +122,8 @@ namespace Oxide.Plugins
                     me.Puts("splatting fall damage in teleport");
                     hitinfo.damageTypes = new DamageTypeList();
                     teleporting.Remove(player.userID);
+                    me.Puts("teleport count 2 is " + me.teleporting.Count);
+
                 }
             }
 
@@ -180,6 +183,19 @@ namespace Oxide.Plugins
         {
             //TODO should save and restore inventory
             player.inventory.Strip();
+        }
+
+        public static void RepairWeapons(BasePlayer player)
+        {
+            int length = 6; // this needs to be changed if the belt size changes
+            for (int i = 0; i < length; i++)
+            {
+                Item item = player.inventory.containerBelt.GetSlot(i);
+                if (item != null)
+                {
+                    item.condition = item.info.condition.max;
+                }
+            }
         }
 
         public static void RefillBeltMagazines(BasePlayer player)
@@ -265,6 +281,21 @@ namespace Oxide.Plugins
             }
             return true;
         }
+        private static bool IsAllowed(BasePlayer player, string perm = null)
+        {
+            var playerAuthLevel = player.net?.connection?.authLevel;
+            //var requiredAuthLevel = configData.Admin.UseableByModerators ? 1 : 2;
+            if (playerAuthLevel >= 2) return true;
+            return !string.IsNullOrEmpty(perm) && me.permission.UserHasPermission(player.UserIDString, perm);
+        }
+
+        public static bool IsAdmin(BasePlayer player, string perm = null)
+        {
+            var playerAuthLevel = player.net?.connection?.authLevel;
+            //var requiredAuthLevel = configData.Admin.UseableByModerators ? 1 : 2;
+            if (playerAuthLevel >= 2) return true;
+            return !string.IsNullOrEmpty(perm) && me.permission.UserHasPermission(player.UserIDString, perm);
+        }
 
         //private bool hasPermission(BasePlayer player, string permname)
         //{
@@ -316,6 +347,13 @@ namespace Oxide.Plugins
         {
             Server.Log("oxide/logs/timerlog.txt", message);
             //iemUtils.Puts(message);
+        }
+
+        public static void hitLog(string message)
+        {
+            Server.Log("oxide/logs/hitlog.txt", message);
+            //iemUtils.Puts(message);
+            //Interface.Oxide.LogInfo("[{0}] {1}", (object)this.Title, (object)(args.Length <= 0 ? format : string.Format(format, args)));
         }
 
         public static void LogL(string message)
@@ -444,12 +482,47 @@ namespace Oxide.Plugins
         }
 
 
+        public static void DestroyAllSpheres()
+        {
+
+            //Vis.Entit
+            //Puts("  >>>>>>Destroy all spheres");
+
+            //foreach (SphereEntity se in BaseEntity.FindObjectsOfType<SphereEntity> ()) {
+            //se.KillMessage ();
+            //Puts ("here");
+            //}
+
+            var foundentities = UnityEngine.Object.FindObjectsOfType<BaseEntity>();
+            uint prefabID = 2327559662;
+            foreach (var entity in foundentities)
+            {
+                if (entity.prefabID == prefabID)
+                {
+                    // Puts("found entity with prefabID "
+                    //          + entity.prefabID.ToString());
+
+                    entity.KillMessage();
+                    //entity.Kill ();
+                }
+            }
+        }
+
+        public delegate void ExitedZone(string ZoneID, BasePlayer player);
+        private static ExitedZone PlayerExitedZone = delegate { };
+        void OnExitZone(string ZoneID, BasePlayer player)
+        {                        //is this a team zone?
+            PlayerExitedZone(ZoneID, player);
+        }
+
         public class ReturnZone
         {
             string zoneid;
             BaseEntity sphere;
             Vector3 location;
+            Vector3 returnlocation;
             HashSet<BasePlayer> playersinzone = new HashSet<BasePlayer>();
+            int radius;
 
             Guid _guid;
 
@@ -458,10 +531,19 @@ namespace Oxide.Plugins
                 return _guid;
             }
 
-            public ReturnZone(Vector3 location, BasePlayer player = null, int radius = 50)
+            public ReturnZone(Vector3 location, BasePlayer player = null,
+                int radius = 50) : this(location, location, player,
+                                radius)
+            {
+
+            }
+
+            public ReturnZone(Vector3 location, Vector3 returnlocation, BasePlayer player = null,
+                int radius = 50)
             {
                 _guid = Guid.NewGuid();
                 zoneid = GetGuid().ToString();
+                this.radius = radius;
 
                 iemUtils.ZoneManager.Call("CreateOrUpdateZone",
                     zoneid,
@@ -477,40 +559,92 @@ namespace Oxide.Plugins
 
 
                 this.location = location;
+                this.returnlocation = returnlocation;
                 sphere = CreateSphere(location, (radius * 2.0f) + 1);
 
                 if (player != null)
                 {
                     AddPlayerToKeepin(player);
                 }
+                PlayerExitedZone += PlayerExitedEndZone;
+            }
+
+            public void PlayerExitedEndZone(string ZoneID, BasePlayer player)
+            {
+                AttractPlayer(player);
+            }
+
+            private void AttractPlayer(BasePlayer player)
+            {
+
+                me.teleporting.Add(player.userID);
+                me.Puts("attracting player in IemUtils - " + zoneid);
+
+                me.Puts("zone pos is " + location);
+                me.Puts("player pos is " + player.transform.position);
+
+                var newPos = location
+                    + (player.transform.position - location).normalized * (radius - 5f);
+
+                me.Puts("new pos is " + newPos);
+
+                newPos.y = TerrainMeta.HeightMap.GetHeight(newPos);
+
+                me.Puts("new pos is " + newPos);
+
+                var newdist = Vector3.Distance(location, newPos);
+
+                me.Puts("distance is " + newdist);
+
+                //if new location is further than radius away from zone centre
+                // then we might as well go back to the zone loc
+                if (newdist > radius)
+                {
+                    newPos = returnlocation;
+                }
+
+                player.MovePosition(newPos);
+                player.ClientRPCPlayer(null, player, "ForcePositionTo", player.transform.position);
+                player.TransformChanged();
+                player.SendNetworkUpdateImmediate();
+
+                me.timer.Once(3f, () =>
+                {
+                    if (me.teleporting.Contains(player.userID))
+                        me.teleporting.Remove(player.userID);
+                });
             }
 
             public void AddPlayerToKeepin(BasePlayer player)
             {
                 playersinzone.Add(player);
-                iemUtils.ZoneManager.Call("AddPlayerToZoneKeepinlist",
-                        zoneid, player);
+                //iemUtils.ZoneManager.Call("AddPlayerToZoneKeepinlist",
+                //        zoneid, player);
             }
 
             public void RemovePlayerFromKeepin(BasePlayer player)
             {
                 if (playersinzone.Contains(player))
                 {
-                //    me.Puts("removing player from zone " + zoneid);
-                    iemUtils.ZoneManager.Call("RemovePlayerFromZoneKeepinlist",
-                            zoneid, player);
+                    //    me.Puts("removing player from zone " + zoneid);
+                    //iemUtils.ZoneManager.Call("RemovePlayerFromZoneKeepinlist",
+                    //        zoneid, player);
+                    playersinzone.Remove(player);
                 }
             }
 
             public void Destroy()
             {
 
-               // me.Puts("destroying zone " + zoneid);
-                foreach (var player in playersinzone)
+                me.Puts("destroying zone " + zoneid);
+
+                var players = new List<BasePlayer>(playersinzone.ToList<BasePlayer>());
+                foreach (var player in players)
                 {
                     RemovePlayerFromKeepin(player);
                 }
-               // me.Puts("erasing zone " + zoneid);
+                PlayerExitedZone -= PlayerExitedEndZone;
+                // me.Puts("erasing zone " + zoneid);
                 me.ZoneManager.Call("EraseZone", zoneid);
                 sphere.KillMessage();
             }
@@ -528,7 +662,7 @@ namespace Oxide.Plugins
         static int collisionLayer = LayerMask.GetMask("Construction", "Construction Trigger",
             "Trigger", "Deployed", "Default");
 
-        public static List<T> FindComponentsNearToLocation<T>(Vector3 location, int radius)
+        public static List<T> FindComponentsNearToLocation<T>(Vector3 location, int radius, string prefab = null)
         {
             //List<T> components = new List<T>();
 
@@ -544,7 +678,8 @@ namespace Oxide.Plugins
         }
 
         // TODO maybe find the nearest collider?
-        public static T FindComponentNearestToLocation<T>(Vector3 location, int radius)
+        public static T FindComponentNearestToLocation<T>(Vector3 location, int radius, string prefab = null) 
+            where T : BaseEntity
         {
             T component = default(T);
 
@@ -565,14 +700,26 @@ namespace Oxide.Plugins
                 //IemUtils.DDLog("colz=" + col.transform.position.z);
                 //IemUtils.DDLog("locz=" + location.z);
 
+
+
                 float tempdist = Vector3.Distance(location, col.transform.position);
 
+                var temp = col.GetComponentInParent<T>();
                 //IemUtils.DDLog("dist is " + tempdist);
+
+                if (prefab != null)
+                {
+                    if (!temp.LookupPrefab().name.ToLower().Contains(prefab.ToLower()))
+                    {
+                        me.Puts("prefab " + temp.LookupPrefab().name);
+                        continue;
+                    }
+                }
 
                 if (tempdist < dist)
                 {
                     dist = tempdist;
-                    component = col.GetComponentInParent<T>();
+                    component = temp;
                 }
 
             }
@@ -831,6 +978,7 @@ namespace Oxide.Plugins
         public static void TeleportPlayerPosition(BasePlayer player, Vector3 destination)
         {
             me.teleporting.Add(player.userID);
+            me.Puts("teleport count us " + me.teleporting.Count);
             DLog("teleporting player from " + player.transform.position.ToString());
             //DLog("teleporting player to   " + destination.ToString());
             destination = GetGroundY(destination);
@@ -842,8 +990,8 @@ namespace Oxide.Plugins
             player.ClientRPCPlayer(null, player, "StartLoading", null, null, null, null, null);
             player.SendFullSnapshot();
 
-            DLog("finished teleporting player from " + player.transform.position.ToString());
-            me.timer.Once(10f, () =>
+            DLog("finished teleporting player to " + player.transform.position.ToString());
+            me.timer.Once(3f, () =>
             {
                 if (me.teleporting.Contains(player.userID))
                     me.teleporting.Remove(player.userID);
@@ -1160,6 +1308,7 @@ namespace Oxide.Plugins
             Running,
             Paused,
             Cancelled,
+            Ended,
             Complete
         };
 
@@ -1630,5 +1779,56 @@ namespace Oxide.Plugins
         }
 
         #endregion
+
+        #region draw building outlines
+
+        public static void DrawFoundation(BasePlayer player,
+             Vector3 point1,
+             Vector3 point2,
+             Vector3 point3,
+             Vector3 point4,
+             Vector3 point5,
+             Vector3 point6,
+             Vector3 point7,
+             Vector3 point8,
+             float time = 3f
+             )
+        {
+
+            player.SendConsoleCommand("ddraw.line", time, Color.blue, point1, point2);
+            player.SendConsoleCommand("ddraw.line", time, Color.blue, point2, point3);
+            player.SendConsoleCommand("ddraw.line", time, Color.blue, point3, point4);
+            player.SendConsoleCommand("ddraw.line", time, Color.blue, point4, point1);
+            //  player.SendConsoleCommand("ddraw.box", 30f, Color.green, pos + Vector3.up, 2);
+
+            player.SendConsoleCommand("ddraw.line", time, Color.blue, point1, point5);
+            player.SendConsoleCommand("ddraw.line", time, Color.blue, point2, point6);
+            player.SendConsoleCommand("ddraw.line", time, Color.blue, point3, point7);
+            player.SendConsoleCommand("ddraw.line", time, Color.blue, point4, point8);
+        }
+
+        public static void DrawTriangleFoundation(BasePlayer player,
+             Vector3 point1,
+             Vector3 point2,
+             Vector3 point3,
+             Vector3 point5,
+             Vector3 point6,
+             Vector3 point7,
+             float time=3f
+             )
+        {
+
+            player.SendConsoleCommand("ddraw.line", time, Color.green, point1, point2);
+            player.SendConsoleCommand("ddraw.line", time, Color.green, point2, point3);
+            player.SendConsoleCommand("ddraw.line", time, Color.green, point3, point1);
+
+            player.SendConsoleCommand("ddraw.line", time, Color.green, point1, point5);
+            player.SendConsoleCommand("ddraw.line", time, Color.green, point2, point6);
+            player.SendConsoleCommand("ddraw.line", time, Color.green, point3, point7);
+        }
+
+        #endregion
+
+
     }
 }

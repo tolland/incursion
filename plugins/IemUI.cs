@@ -47,7 +47,7 @@ namespace Oxide.Plugins
             //if the server restarted during a banner, these need to be removed
             RemoveUIs();
             IemUtils.LogL("IncursionUI: on server initialized");
-         
+
 
         }
 
@@ -544,7 +544,7 @@ namespace Oxide.Plugins
         public static Dictionary<string, ConfirmCancelBlock> confirms = new Dictionary<string, ConfirmCancelBlock>();
 
         public static void Confirm(BasePlayer player, string message,
-            string confirmMsg, 
+            string confirmMsg,
             Action confirmCode)
         {
             confirms[player.UserIDString] = new ConfirmCancelBlock
@@ -613,8 +613,8 @@ namespace Oxide.Plugins
         }
 
         public static void ConfirmCancel(BasePlayer player, string message,
-            string confirmMsg, string cancelMsg,
-            Action confirmCode, Action cancelCode)
+           string confirmMsg, string cancelMsg,
+           Action confirmCode, Action cancelCode, bool lowprofile = false)
         {
             confirms[player.UserIDString] = new ConfirmCancelBlock
             {
@@ -630,26 +630,42 @@ namespace Oxide.Plugins
             CuiHelper.DestroyUi(player, gui);
 
             var elements = new CuiElementContainer();
+
+            var AnchorMinVal = "";
+            var AnchorMaxVal = "";
+
+            if (lowprofile)
+            {
+                AnchorMinVal = "0.3 0.1";
+                AnchorMaxVal = "0.7 0.3";                
+            }
+            else
+            {
+                AnchorMinVal = "0.3 0.3";
+                AnchorMaxVal = "0.7 0.7";
+            }
             var mainName = elements.Add(new CuiPanel
             {
                 Image =
                 {
-                    Color = "0.1 0.1 0.1 1"
+                    Color = "0.1 0.1 0.1 0.5"
                 },
                 RectTransform =
                 {
-                    AnchorMin = "0.3 0.3",
-                    AnchorMax = "0.7 0.7"
+                    AnchorMin = AnchorMinVal,
+                    AnchorMax = AnchorMaxVal
                 },
                 CursorEnabled = true
             }, "Overlay", gui);
+
+
             var confirmButton = new CuiButton
             {
                 Button =
                 {
                     //Close = mainName,
                     Command = "iem.ui confirm_ok",
-                    Color = "0.1 0.8 0.1 0.2"
+                    Color = "0.1 0.8 0.1 0.8"
                 },
                 RectTransform =
                 {
@@ -670,7 +686,7 @@ namespace Oxide.Plugins
                 {
                     //Close = mainName,
                     Command = "iem.ui confirm_cancel",
-                    Color = "0.8 0.1 0.1 0.2"
+                    Color = "0.8 0.1 0.1 0.8"
                 },
                 RectTransform =
                 {

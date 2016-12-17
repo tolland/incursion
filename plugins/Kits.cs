@@ -15,7 +15,7 @@ namespace Oxide.Plugins
         readonly int playerLayer = LayerMask.GetMask("Player (Server)");
 
         //////////////////////////////////////////////////////////////////////////////////////////
-        ///// Plugin initialization
+        ///// Plugin initialization 
         //////////////////////////////////////////////////////////////////////////////////////////
         [PluginReference]
         Plugin CopyPaste;
@@ -297,6 +297,11 @@ namespace Oxide.Plugins
             if (!storedData.Kits.TryGetValue(kitname, out kit)) return false;
             if (kit.hide)
                 return false;
+
+
+            Puts("kitname " + kitname);
+            Puts("authlevel " + kit.authlevel);
+
             if (kit.authlevel > 0)
                 if (player.net.connection.authLevel < kit.authlevel)
                     return false;
@@ -311,7 +316,7 @@ namespace Oxide.Plugins
                 if (left >= kit.max)
                 {
                     reason += "- 0 left";
-                    return false;
+                    //return false;
                 }
                 reason += $"- {(kit.max - left)} left";
             }
@@ -322,9 +327,11 @@ namespace Oxide.Plugins
                 if (cd > ct && cd != 0.0)
                 {
                     reason += $"- {Math.Abs(Math.Ceiling(cd - ct))} seconds";
-                    return false;
+                    Puts("reason "+reason);
+                    //return false;
                 }
             }
+            Puts("returning true");
             return true;
 
         }
@@ -958,6 +965,11 @@ namespace Oxide.Plugins
         //////////////////////////////////////////////////////////////////////////////////////
         [HookMethod("GetAllKits")]
         public string[] GetAllKits() => storedData.Kits.Keys.ToArray();
+
+        public string GetKitContents1(string kitname)
+        {
+            return "test";
+        }
 
         [HookMethod("GetKitContents")]
         public string[] GetKitContents(string kitname)

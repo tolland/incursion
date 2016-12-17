@@ -5,6 +5,9 @@ using System.Linq;
 using Oxide.Core;
 using UnityEngine;
 using Oxide.Game.Rust.Cui;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Converters;
+using Newtonsoft.Json.Linq;
 
 namespace Oxide.Plugins
 {
@@ -78,6 +81,7 @@ namespace Oxide.Plugins
             {
                 if (game.CurrentState == IemUtils.State.Before
                     || game.CurrentState == IemUtils.State.Running
+                    || game.CurrentState == IemUtils.State.Ended
                     || game.CurrentState == IemUtils.State.Paused)
                 {
                     game.CancelGame();
@@ -87,9 +91,7 @@ namespace Oxide.Plugins
             if (gameManagers.ContainsKey(gm.GetType().Name))
                 gameManagers.Remove(gm.GetType().Name);
         }
-
-
-
+        
         public static Dictionary<string, GameManager> GetGameManagers()
         {
             IemUtils.DLog("listing game managers registered");
@@ -128,7 +130,7 @@ namespace Oxide.Plugins
         {
             public string Description { get; set; }
             public string Name { get; set; }
-            public List<GameLevel> GameLevels { get; set; }
+            public List<GameLevelDefinition> GameLevelDefinitions { get; set; }
         }
 
         public class GameManager
@@ -252,6 +254,7 @@ namespace Oxide.Plugins
             public static bool OnlyOneAtATime = false;
             public DateTime StartedTime { get; set; }
             public DateTime EndedTime { get; set; }
+            [JsonIgnore]
             public Dictionary<string, IemUtils.IIemPlayer> Players { get; set; }
             public int MaxPlayers { get; set; }
             public int MinPlayers { get; set; }
@@ -259,7 +262,13 @@ namespace Oxide.Plugins
             public string difficultyLevel = "Easy";
             public double totalTime = 0;
 
+
+            public bool HasGameLevels { get; set; }
+            public List<GameLevel> gamelevels = new List<GameLevel>();
+            public int level = -1;
+
             //track gamezones
+            [JsonIgnore]
             public Dictionary<string, IemUtils.GameZone> gamezones = new Dictionary<string, IemUtils.GameZone>();
 
             public void AddGameZone(string name, Vector3 location, int radius)
@@ -280,7 +289,7 @@ namespace Oxide.Plugins
 
             }
 
-            Guid _guid;
+            public Guid _guid;
 
             public Guid GetGuid()
             {
@@ -339,7 +348,7 @@ namespace Oxide.Plugins
             /// <returns></returns>
             public virtual bool EndGame()
             {
-                CurrentState = IemUtils.State.Complete;
+                CurrentState = IemUtils.State.Ended;
                 EndedTime = DateTime.Now;
                 CleanUp();
 
@@ -348,6 +357,14 @@ namespace Oxide.Plugins
                     Interface.Oxide.CallHook("OnGameEnded", BasePlayer.Find(player.PlayerId), this);
                 }
 
+                return true;
+            }
+
+            //This means that the gsm has not more interest in the game
+            //with respect to cleaning up
+            public virtual bool MarkComplete()
+            {
+                CurrentState = IemUtils.State.Complete;
                 return true;
             }
 
@@ -390,6 +407,11 @@ namespace Oxide.Plugins
                 return true;
             }
 
+            public virtual bool RestartLevel()
+            {
+                return true;
+            }
+
             public virtual void RestoreBasePlayers()
             {
                 foreach (var player in Players.Values)
@@ -412,14 +434,20 @@ namespace Oxide.Plugins
 
         public class IemSoloGame : IemGame
         {
+            [JsonIgnore]
             public BasePlayer player;
+
+            public string displayname;
             public string UserIDString;
+
+            [JsonIgnore]
             public IemPlayer iemPlayer;
 
             public IemSoloGame(BasePlayer newPlayer)
             {
                 player = newPlayer;
                 UserIDString = player.UserIDString;
+                displayname = player.displayName;
             }
 
 
@@ -825,13 +853,32 @@ namespace Oxide.Plugins
 
         public class GameLevelDefinition
         {
+            // number of targets required to complete this level
+            public int Targets { get; set; }
+            // level timer starting amount
+            public int Timer { get; set; }
+            // if min accuracy is required to complete level
+            public float Accuracy { get; set; }
+            // kit that the player will be initialized with
+            public string kitname { get; set; }
+            // if this is true, any weapons on the belt will be filled with ammo to max
+            public bool fillmagazines { get; set; }
 
         }
 
         public class GameLevel
         {
+            [JsonIgnore]
             public IemGame Game { get; set; }
+
+            [JsonIgnore]
             public BasePlayer Player { get; set; }
+
+            [JsonIgnore]
+            public IemUtils.ReturnZone returnZone { get; set; }
+
+            // the definition that this level was made from
+            internal GameLevelDefinition gameLevelDefinition { get; set; }
             public GameLevelAccuracy accuracy { get; set; }
             public int Timer { get; set; }
             private bool started = false;

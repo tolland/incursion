@@ -11,12 +11,13 @@ using Oxide.Game.Rust.Cui;
 using Rust;
 using UnityEngine;
 using System.Linq;
+using Newtonsoft.Json;
 
 namespace Oxide.Plugins
 {
     [Info("Incursion Target Practice", "tolland", "0.1.0")]
     class IemGameTargetPractice : RustPlugin
-    {
+    { 
 
         #region header
 
@@ -43,7 +44,7 @@ namespace Oxide.Plugins
 
         #endregion
 
-        #region boiler plate
+        #region boiler plate 
 
         void Init()
         {
@@ -105,41 +106,32 @@ namespace Oxide.Plugins
                 { "Easy", new IemGameBase.DifficultyMode {
                     Name ="Easy",
                     Description ="Easy going",
-                    GameLevels = new List<IemGameBase.GameLevel>(   new TPGameLevel[] {
-                new TPGameLevel {Targets=5, Timer=20},
-                new TPGameLevel {Targets=7, Timer=20},
-                new TPGameLevel {Targets=8, Timer=18},
-               //new GameLevel {Targets=9, Timer=17, IemGame=this},
-                //new GameLevel {Targets=9, Timer=18, IemGame=this},
-                //new GameLevel {Targets=11, Timer=18, IemGame=this},
-                //new GameLevel {Targets=11, Timer=18, IemGame=this},
-                //new GameLevel {Targets=12, Timer=17, IemGame=this}
+                    GameLevelDefinitions = new List<IemGameBase.GameLevelDefinition>(   new TPGameLevelDefinition[] {
+                new TPGameLevelDefinition {Targets=5, Timer=20, kitname="tpv1_ak"},
+                new TPGameLevelDefinition {Targets=6, Timer=20, kitname="tpv1_p250"},
+                new TPGameLevelDefinition {Targets=5, Timer=18, kitname="tpv1_revolver"},
                     }  )
             } },
                     { "Moderate",
                 new IemGameBase.DifficultyMode {
                     Name ="Moderate",
                     Description ="Some practice required",
-                    GameLevels = new List<IemGameBase.GameLevel>(   new TPGameLevel[] {
-                new TPGameLevel {Targets=6, Timer=18},
-                new TPGameLevel {Targets=7, Timer=18},
-                new TPGameLevel {Targets=7, Timer=17},
-                new TPGameLevel {Targets=8, Timer=17},
-                //new GameLevel {Targets=9, Timer=18, IemGame=this},
-                //new GameLevel {Targets=11, Timer=18, IemGame=this},
-                //new GameLevel {Targets=11, Timer=18, IemGame=this},
-                //new GameLevel {Targets=12, Timer=17, IemGame=this}
+                    GameLevelDefinitions = new List<IemGameBase.GameLevelDefinition>(   new TPGameLevelDefinition[] {
+                new TPGameLevelDefinition {Targets=6, Timer=18},
+                new TPGameLevelDefinition {Targets=7, Timer=18},
+                new TPGameLevelDefinition {Targets=7, Timer=17},
+                new TPGameLevelDefinition {Targets=8, Timer=17},
                     }  )
             } },
                     { "Challenging",
                 new IemGameBase.DifficultyMode {
                     Name ="Challenging",
                     Description ="Challenging to complete",
-                    GameLevels = new List<IemGameBase.GameLevel>(   new TPGameLevel[] {
-                new TPGameLevel {Targets=6, Timer=18},
-                new TPGameLevel {Targets=7, Timer=18},
-                new TPGameLevel {Targets=7, Timer=17},
-                new TPGameLevel {Targets=8, Timer=17},
+                    GameLevelDefinitions = new List<IemGameBase.GameLevelDefinition>(   new TPGameLevelDefinition[] {
+                new TPGameLevelDefinition {Targets=6, Timer=18},
+                new TPGameLevelDefinition {Targets=7, Timer=18},
+                new TPGameLevelDefinition {Targets=7, Timer=17},
+                new TPGameLevelDefinition {Targets=8, Timer=17},
                 //new GameLevel {Targets=9, Timer=18, IemGame=this},
                 //new GameLevel {Targets=11, Timer=18, IemGame=this},
                 //new GameLevel {Targets=11, Timer=18, IemGame=this},
@@ -150,15 +142,15 @@ namespace Oxide.Plugins
                 new IemGameBase.DifficultyMode {
                     Name ="Impossible",
                     Description ="Only the best of the best",
-                    GameLevels = new List<IemGameBase.GameLevel>(   new TPGameLevel[] {
-                new TPGameLevel {Targets=6, Timer=18},
-                new TPGameLevel {Targets=7, Timer=18},
-                new TPGameLevel {Targets=7, Timer=17},
-                new TPGameLevel {Targets=8, Timer=17},
-                new TPGameLevel {Targets=9, Timer=18},
-                new TPGameLevel {Targets=11, Timer=18},
-                new TPGameLevel {Targets=11, Timer=18},
-                new TPGameLevel {Targets=10, Timer=14}
+                    GameLevelDefinitions = new List<IemGameBase.GameLevelDefinition>(   new TPGameLevelDefinition[] {
+                new TPGameLevelDefinition {Targets=6, Timer=18},
+                new TPGameLevelDefinition {Targets=7, Timer=18},
+                new TPGameLevelDefinition {Targets=7, Timer=17},
+                new TPGameLevelDefinition {Targets=8, Timer=17},
+                new TPGameLevelDefinition {Targets=9, Timer=18},
+                new TPGameLevelDefinition {Targets=10, Timer=18},
+                new TPGameLevelDefinition {Targets=10, Timer=17},
+                new TPGameLevelDefinition {Targets=11, Timer=17}
                     }  )
             } }
                     };
@@ -173,15 +165,16 @@ namespace Oxide.Plugins
                 //me.Puts("in the tp game manager, creating new game");
                 var newGame = new IemGameTargetPracticeGame(player);
 
-                foreach (TPGameLevel origlevel in difficultyModes[level].GameLevels
-                    .Cast<TPGameLevel>().ToList())
+                foreach (TPGameLevelDefinition origlevel in difficultyModes[level].GameLevelDefinitions
+                    .Cast<TPGameLevelDefinition>().ToList())
                 {
                     TPGameLevel newLevel = new TPGameLevel()
                     {
                         Game = newGame,
                         Targets = origlevel.Targets,
                         Timer = origlevel.Timer,
-                        Player = player
+                        Player = player,
+                        gameLevelDefinition = origlevel
                     };
                     newGame.gamelevels.Add(newLevel);
                 }
@@ -206,6 +199,11 @@ namespace Oxide.Plugins
             }
         }
 
+        public class TPGameLevelDefinition : IemGameBase.GameLevelDefinition
+        {
+            // public int Targets { get; set; }
+        }
+
         public class TPGameLevel : IemGameBase.GameLevel
         {
             public int Targets { get; set; }
@@ -213,17 +211,15 @@ namespace Oxide.Plugins
 
         public class IemGameTargetPracticeGame : IemGameBase.IemSoloGame
         {
+            [JsonIgnore]
             public TargetPracticeStateManager gsm;
 
-            public List<TPGameLevel> gamelevels = new List<TPGameLevel>();
-
+            [JsonIgnore]
             public IemUtils.ReturnZone returnZone;
-
-            // level 0 is pregame
-            public int level = -1;
 
             // find reactive targets within 50 units of the game location
             // TODO this presumes that the game is a skygame
+            [JsonIgnore]
             public List<ReactiveTarget> targets = new List<ReactiveTarget>();
 
             public IemGameTargetPracticeGame(BasePlayer newPlayer) : base(newPlayer)
@@ -231,6 +227,8 @@ namespace Oxide.Plugins
                 Name = "Target_Practice";
                 OnlyOneAtATime = true;
                 Mode = "Solo";
+                // level 0 is pregame
+                level = -1;
 
                 gsm = new TargetPracticeStateManager(
                         TargetPracticeStateManager.Created.Instance, this);
@@ -269,7 +267,7 @@ namespace Oxide.Plugins
 
             public bool CheckLevelComplete()
             {
-                TPGameLevel gamelevel = gamelevels[level];
+                TPGameLevel gamelevel = (TPGameLevel)gamelevels[level];
                 if (iemPlayer.Score >= gamelevel.Targets)
                     return true;
 
@@ -285,9 +283,6 @@ namespace Oxide.Plugins
                     + "\nshots hit " + gamelevels[level].accuracy.ShotsHit + "\naccuracy "
                     + gamelevels[level].accuracy.GetAccuracyAsString());
 
-                //me.Puts("level = " + level);
-                //me.Puts("gamelevels.Count = " + gamelevels.Count);
-
                 // level is indexed at 1 when game is in progress, 0 is pregame
                 if (level == (gamelevels.Count - 1))
                 {
@@ -297,26 +292,35 @@ namespace Oxide.Plugins
                 else
                 {
                     // me.Puts("going to next level");
-                    gsm?.ChangeState(TargetPracticeStateManager.GameRunning.Instance);
+                    //player.inventory.Strip();
+                    me.timer.Once(1f, () =>
+
+                        gsm?.ChangeState(TargetPracticeStateManager.GameRunning.Instance)
+                         );
                 }
             }
 
             public void wasCancelled()
             {
-                me.Puts("was cancelled");
                 IemUI.CreateFadeoutBanner(player, "cancelling");
                 CancelGame();
             }
 
             public void wasConfirmed()
             {
-                IemUI.CreateFadeoutBanner(player, "playing level again");
                 gsm?.ChangeState(TargetPracticeStateManager.GameRunning.Instance);
+            }
+
+            public override bool RestartLevel()
+            {
+                gsm?.ChangeState(TargetPracticeStateManager.GameRunning.Instance);
+
+
+                return true;
             }
 
             public void playAgain()
             {
-                //me.Puts("playing again");
                 IemUI.CreateFadeoutBanner(player, "playing again");
                 gsm?.ChangeState(TargetPracticeStateManager.GameComplete.Instance);
             }
@@ -332,7 +336,6 @@ namespace Oxide.Plugins
                 ItemModProjectile mod,
                 ProtoBuf.ProjectileShoot projectiles)
             {
-                //me.Puts("OnWeaponFired works!");
                 //var attacker = (BasePlayer)hitinfo.Initiator;
                 if (player.UserIDString != iemPlayer.AsBasePlayer().UserIDString)
                 {
@@ -341,7 +344,7 @@ namespace Oxide.Plugins
                 }
                 else
                 {
-                    TPGameLevel gamelevel = gamelevels[level];
+                    TPGameLevel gamelevel = (TPGameLevel)gamelevels[level];
                     gamelevel.accuracy.ShotsFired += 1;
                 }
 
@@ -387,7 +390,7 @@ namespace Oxide.Plugins
                         //this is the amount of damage done to the target by the hit
                         var health = knockdownHealth.GetValue(target);
 
-                        TPGameLevel gamelevel = gamelevels[level];
+                        TPGameLevel gamelevel = (TPGameLevel)gamelevels[level];
 
                         if (!gamelevel.Started)
                         {
@@ -406,6 +409,7 @@ namespace Oxide.Plugins
                         {
                             iemPlayer.Score += 1;
                             IemUI.CreateGameBanner(attacker, "Level " + (level + 1) +
+                                "/" + gamelevels.Count +
                                 " - targets remaining " + (gamelevel.Targets - iemPlayer.Score));
 
                             if (CheckLevelComplete())
@@ -418,6 +422,11 @@ namespace Oxide.Plugins
                                 target.health = target.MaxHealth();
                                 target.SendNetworkUpdate();
                             }
+
+                            targets[new System.Random().Next(0,
+                                 targets.Count)].ResetTarget();
+
+
                         }
                     }
                 }
@@ -508,6 +517,7 @@ namespace Oxide.Plugins
 
                     me.Puts("player start location is " + playerstart);
                     me.Puts("player look location is " + playerlook);
+
                     me.Puts("swutcged " + IemUtils.SwitchTypesToTarget<BaseOven>(gsm.location));
 
                     gsm.eg.player.inventory.Strip();
@@ -528,7 +538,7 @@ namespace Oxide.Plugins
 
                     IemUtils.PlaySound(gsm.eg.player);
 
-                    gsm.eg.returnZone = new IemUtils.ReturnZone(playerstart, gsm.eg.player );
+                    gsm.eg.returnZone = new IemUtils.ReturnZone(playerstart, gsm.eg.player);
 
                     IemUI.Confirm(gsm.eg.player, $"Weclome to target practice\n" +
                         $"Knock down the targets to proceed to the next level.\n" +
@@ -536,6 +546,19 @@ namespace Oxide.Plugins
                         gsm.proceedAction);
 
                     gsm.eg.targets = IemUtils.FindComponentsNearToLocation<ReactiveTarget>(gsm.location, 50);
+
+                    me.Puts("targets count is " + gsm.eg.targets.Count());
+                    var targetbuff = new List<ReactiveTarget>();
+                    for (int i = 0; i < gsm.eg.targets.Count; i++)
+                    {
+                        if (gsm.eg.targets[i] != null && !gsm.eg.targets[i].isDestroyed)
+                        {
+                            targetbuff.Add(gsm.eg.targets[i]);
+                        }
+                    }
+                    gsm.eg.targets = targetbuff;
+
+
                     me.Puts("targets count is " + gsm.eg.targets.Count());
                 }
 
@@ -569,16 +592,28 @@ namespace Oxide.Plugins
                         {
                             gsm.eg.gamelevels[gsm.eg.level].Reset();
                         }
+                        else if (!gsm.eg.gamelevels[gsm.eg.level].Started &&
+                        !gsm.eg.gamelevels[gsm.eg.level].Ended)
+                        {
+                            //erm what to do if game is not started or ended???
+                        }
                         else
                         {
                             // this is a new level
                             gsm.eg.level++;
-
                         }
                     }
 
                     // get the properties of this game level
-                    TPGameLevel gamelevel = gsm.eg.gamelevels[gsm.eg.level];
+                    TPGameLevel gamelevel = (TPGameLevel)gsm.eg.gamelevels[gsm.eg.level];
+
+                    if (gamelevel.gameLevelDefinition.kitname != null)
+                    {
+                        gsm.eg.player.inventory.Strip();
+                        me.Kits?.Call("GiveKit", gsm.eg.player, gamelevel.gameLevelDefinition.kitname);
+                        gsm.eg.player.inventory.SendSnapshot();
+                    }
+
 
                     EntitiesTakingDamage += gsm.eg.PlayerImmortal;
 
@@ -587,6 +622,7 @@ namespace Oxide.Plugins
 
 
                     IemUI.CreateGameBanner(gsm.eg.player, "Level " + (gsm.eg.level + 1) +
+                                "/" + gsm.eg.gamelevels.Count +
                         " - targets remaining " + (gamelevel.Targets - gsm.eg.iemPlayer.Score));
 
                     IemUtils.GameTimer.CreateTimerPaused(gsm.eg.player, gamelevel.Timer, () =>
@@ -596,7 +632,8 @@ namespace Oxide.Plugins
                             IemUI.ConfirmCancel(gsm.eg.player,
                                 "Level was not completed!\nYou can play this level again, or return to the map", "Play Again", "Quit",
                                 gsm.eg.wasConfirmed,
-                                gsm.eg.wasCancelled);
+                                gsm.eg.wasCancelled,
+                                true);
                         }
                     });
 
@@ -610,11 +647,15 @@ namespace Oxide.Plugins
                     {
                         if (target != null)
                         {
-                            target.ResetTarget();
-                            var health = knockdownHealth.GetValue(target);
+                            //target.ResetTarget();
+                            //var health = knockdownHealth.GetValue(target);
                             knockdownHealth.SetValue(target, 100f);
+                            target.SetFlag(BaseEntity.Flags.On, false);
                         }
                     }
+
+                    gsm.eg.targets[new System.Random().Next(0,
+                        gsm.eg.targets.Count)].SetFlag(BaseEntity.Flags.On, true);
 
                     RunWeaponFired += gsm.eg.TPWeaponFired;
                     IemUtils.PlaySound(gsm.eg.player);
@@ -624,20 +665,22 @@ namespace Oxide.Plugins
                 {
                     TargetPracticeStateManager gsm = (TargetPracticeStateManager)sm;
 
+                    //stop the level timer
+                    IemUtils.GameTimer.Destroy(gsm.eg.player);
+
+                    //stop counting shots fired
                     RunWeaponFired -= gsm.eg.TPWeaponFired;
-
-                    IemUI.CreateGameBanner(gsm.eg.player, "");
-
-                    TPGameLevel gamelevel = gsm.eg.gamelevels[gsm.eg.level];
-
+                    //stop protecting player from damage
                     EntitiesTakingDamage -= gsm.eg.PlayerImmortal;
+                    //stop counting targets hit
                     EntitiesTakingDamage -= gsm.eg.ScorePlayerHit;
 
+                    //reset  the game banners
+                    IemUI.CreateGameBanner(gsm.eg.player, "");
                     IemUI.CreateGameBanner2(gsm.eg.player, "");
 
-
+                    // if there is a fadeout banner, remove it
                     CuiHelper.DestroyUi(gsm.eg.player, "CreateFadeoutBanner");
-                    IemUtils.GameTimer.Destroy(gsm.eg.player);
                 }
             }
 
@@ -648,6 +691,8 @@ namespace Oxide.Plugins
                 public new void Enter(IemStateManager.StateManager sm)
                 {
                     TargetPracticeStateManager gsm = (TargetPracticeStateManager)sm;
+
+                    CuiHelper.DestroyUi(gsm.eg.player, "ConfirmComplete");
 
                     List<ReactiveTarget> targets = IemUtils.FindComponentsNearToLocation<ReactiveTarget>(gsm.location, 50);
                     foreach (var target in targets)
@@ -670,7 +715,15 @@ namespace Oxide.Plugins
                     IemUI.Confirm(gsm.eg.player, "Game completed!\nreturn to the map",
                         "Back",
                     gsm.eg.backToTheMap);
-                } 
+
+                    //IemUI.ConfirmCancel(gsm.eg.player,
+                    //    "Game completed!\nreturn to the map\nor play again", 
+                    //    "Play Again", "Quit",
+                    //    gsm.eg.wasConfirmed,
+                    //    gsm.eg.backToTheMap);
+
+
+                }
 
                 public new void Exit(IemStateManager.StateManager sm)
                 {
@@ -692,9 +745,8 @@ namespace Oxide.Plugins
 
                 public new void Enter(IemStateManager.StateManager sm)
                 {
-                    TargetPracticeStateManager gsm = (TargetPracticeStateManager)sm; 
+                    TargetPracticeStateManager gsm = (TargetPracticeStateManager)sm;
                     gsm?.ChangeState(TargetPracticeStateManager.CleanUp.Instance);
-
                 }
             }
 
@@ -707,8 +759,10 @@ namespace Oxide.Plugins
 
                     gsm.eg.returnZone.Destroy();
 
+                    me.Puts("moving player to previous location " + gsm.eg.iemPlayer.PreviousLocation);
                     IemUtils.MovePlayerToTeamLocation(gsm.eg.player,
                         gsm.eg.iemPlayer.PreviousLocation);
+
                     gsm.partition.Remove();
                     me.IemUtils.RestoreInventory(gsm.eg.player, gsm.eg.GetGuid());
                 }

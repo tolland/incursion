@@ -15,7 +15,7 @@ namespace Oxide.Plugins
         //////////////////////////////////////////////////////////////////////////////////////////////////////////////
         // Static Fields
         //////////////////////////////////////////////////////////////////////////////////////////////////////////////
-         
+
         string copyPermission = "copypaste.copy";
         string pastePermission = "copypaste.paste";
         string undoPermission = "copypaste.undo";
@@ -88,7 +88,7 @@ namespace Oxide.Plugins
         // Copy
         //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-        bool isValid(BaseEntity entity) { return entity.GetComponentInParent<BuildingBlock>() || entity.GetComponentInParent<BaseCombatEntity>() || entity.GetComponentInParent<Spawnable>(); }
+        bool isValid(BaseEntity entity) { return (entity.GetComponentInParent<BuildingBlock>() != null || entity.GetComponentInParent<BaseCombatEntity>() != null || entity.GetComponentInParent<Spawnable>() != null); }
 
         void TryCopyLock(BaseEntity lockableEntity, IDictionary<string, object> housedata)
         {
@@ -111,7 +111,7 @@ namespace Oxide.Plugins
                         code |= 0x80;
                     codedata.Add("code", code.ToString());
                 }
-                housedata.Add("lock",codedata);
+                housedata.Add("lock", codedata);
             }
         }
         object CopyByBuilding(Vector3 sourcePos, Vector3 sourceRot, float RotationCorrection, float range, bool saveBuildings, bool saveDeployables, bool saveInventories)
@@ -140,7 +140,7 @@ namespace Oxide.Plugins
                             if (buildingblock)
                             {
                                 if (buildingid == 0) buildingid = buildingblock.buildingID;
-                                else if(buildingid != buildingblock.buildingID) continue;
+                                else if (buildingid != buildingblock.buildingID) continue;
                             }
                             if (!checkFrom.Contains(entity.transform.position)) checkFrom.Add(entity.transform.position);
 
@@ -238,19 +238,19 @@ namespace Oxide.Plugins
             bool saveInventories = true;
             bool saveDeployables = true;
             bool saveBuilding = true;
-            for(int i = 0; ; i = i + 2)
+            for (int i = 0; ; i = i + 2)
             {
                 if (i >= args.Length) break;
-                if(i+1 >= args.Length)
+                if (i + 1 >= args.Length)
                 {
                     return GetMsg("Syntax: /copy TARGETFILENAME options values\r\n radius XX (default 3)\r\n mechanics proximity/building (default building)\r\nbuilding true/false (saves structures or not)\r\ndeployables true/false (saves deployables or not)\r\ninventories true/false (saves inventories or not)", null);
                 }
-                switch(args[i].ToLower())
+                switch (args[i].ToLower())
                 {
                     case "r":
                     case "rad":
                     case "radius":
-                        if(!float.TryParse(args[i+1], out radius))
+                        if (!float.TryParse(args[i + 1], out radius))
                         {
                             return "radius must be a number";
                         }
@@ -258,7 +258,7 @@ namespace Oxide.Plugins
                     case "mechanics":
                     case "m":
                     case "mecha":
-                        switch(args[i+1].ToLower())
+                        switch (args[i + 1].ToLower())
                         {
                             case "building":
                             case "build":
@@ -275,7 +275,7 @@ namespace Oxide.Plugins
                     case "i":
                     case "inventories":
                     case "inv":
-                        if(!bool.TryParse(args[i + 1], out saveInventories))
+                        if (!bool.TryParse(args[i + 1], out saveInventories))
                         {
                             return "save inventories needs to be true or false";
                         }
@@ -305,7 +305,7 @@ namespace Oxide.Plugins
 
             return Copy(sourcePos, sourceRot, filename, RotationCorrection, copyMechanics, radius, saveBuilding, saveDeployables, saveInventories);
         }
-        object Copy(Vector3 sourcePos, Vector3 sourceRot, string filename, float RotationCorrection, CopyMechanics copyMechanics, float range, bool saveBuildings, bool saveDeployables, bool saveInventories )
+        object Copy(Vector3 sourcePos, Vector3 sourceRot, string filename, float RotationCorrection, CopyMechanics copyMechanics, float range, bool saveBuildings, bool saveDeployables, bool saveInventories)
         {
             var rawData = new List<object>();
             var copy = copyMechanics == CopyMechanics.Proximity ? CopyByProximity(sourcePos, sourceRot, RotationCorrection, range, saveBuildings, saveDeployables, saveInventories) : CopyByBuilding(sourcePos, sourceRot, RotationCorrection, range, saveBuildings, saveDeployables, saveInventories); ;
@@ -334,7 +334,7 @@ namespace Oxide.Plugins
             return true;
         }
 
-        Dictionary<string,object> EntityData(BaseEntity entity, Vector3 sourcePos, Vector3 sourceRot, Vector3 entPos, Vector3 entRot, float diffRot, bool saveInventories)
+        Dictionary<string, object> EntityData(BaseEntity entity, Vector3 sourcePos, Vector3 sourceRot, Vector3 entPos, Vector3 entRot, float diffRot, bool saveInventories)
         {
             var normalizedPos = NormalizePosition(sourcePos, entPos, diffRot);
             var normalizedRot = entRot.y - diffRot;
@@ -363,7 +363,7 @@ namespace Oxide.Plugins
                 TryCopyLock(entity, data);
 
             var buildingblock = entity.GetComponentInParent<BuildingBlock>();
-            if (buildingblock != null )
+            if (buildingblock != null)
             {
                 data.Add("grade", buildingblock.grade);
             }
@@ -384,22 +384,22 @@ namespace Oxide.Plugins
                             {"skinid", item.skin },
                         };
                         var heldEnt = item.GetHeldEntity();
-                        if(heldEnt != null)
+                        if (heldEnt != null)
                         {
                             var projectiles = heldEnt.GetComponent<BaseProjectile>();
-                            if(projectiles != null)
+                            if (projectiles != null)
                             {
                                 var magazine = projectiles.primaryMagazine;
-                                if(magazine != null)
+                                if (magazine != null)
                                 {
                                     itemdata.Add("magazine", new Dictionary<string, object> { { magazine.ammoType.itemid.ToString(), magazine.contents } });
                                 }
                             }
                         }
-                        
-                        if(item.contents != null)
+
+                        if (item.contents != null)
                         {
-                            if(item.contents.itemList != null)
+                            if (item.contents.itemList != null)
                             {
                                 var contents = new List<object>();
                                 foreach (Item item2 in item.contents.itemList)
@@ -424,7 +424,7 @@ namespace Oxide.Plugins
             }
 
             var sign = entity.GetComponentInParent<Signage>();
-            if(sign != null)
+            if (sign != null)
             {
                 var get = FileStorage.server.Get(sign.textureID, FileStorage.Type.png, sign.net.ID);
                 data.Add("sign", new Dictionary<string, object>
@@ -484,13 +484,13 @@ namespace Oxide.Plugins
             ulong userid;
             if (!ulong.TryParse(steamid, out userid)) { return "First argument isn't a steamid"; }
             var player = BasePlayer.FindByID(userid);
-            if(player == null) return "Couldn't find the player";
+            if (player == null) return "Couldn't find the player";
             if (!player.IsConnected()) return "Player is not connected?";
 
             return TryPasteFromPlayer(player, filename, args);
         }
 
-        object TryPasteFromPlayer(BasePlayer player, string filename, string[] args)
+        object TryPasteFromPlayer(BasePlayer player, string filename, string[] args, bool preview = false)
         {
             if (player == null) return "Player is null?";
             if (!player.IsConnected()) return "Player is not connected?";
@@ -499,29 +499,37 @@ namespace Oxide.Plugins
             BaseEntity sourceEntity;
             Vector3 sourcePoint;
 
-            if (!FindRayEntity(player.eyes.position, ViewAngles * Vector3.forward, out sourcePoint, out sourceEntity)) {
+            if (!FindRayEntity(player.eyes.position, ViewAngles * Vector3.forward,
+                out sourcePoint, out sourceEntity))
+            {
                 return GetMsg("Couldn't ray something valid in front of you.", player.userID.ToString());
             }
 
-            return TryPaste(sourcePoint, filename, player, ViewAngles.ToEulerAngles().y, args);
+            Puts("here " + filename);
+
+            return TryPaste(sourcePoint, filename, player, ViewAngles.ToEulerAngles().y, args, preview);
         }
 
-        object TryPaste(Vector3 startPos, string filename, BasePlayer player, float RotationCorrection, string[] args)
+        object TryPaste(Vector3 startPos, string filename, BasePlayer player,
+            float RotationCorrection, string[] args, bool preview = false)
         {
-
-            Puts("here233333");
-
             var steamid = player == null ? null : player.userID.ToString();
+
+            DestroyAllSpheres();
+            //    Puts("startpos " + startPos);   
+            //   CreateSphere(startPos, 0.2f);
 
             string path = subDirectory + filename;
 
             if (datafile.ExistsDatafile(path)) { }
 
             var data = Interface.GetMod().DataFileSystem.GetDatafile(path);
-            if(data["default"] == null || data["entities"] == null)
+            if (data["default"] == null || data["entities"] == null)
             {
                 return GetMsg("This file is empty.", steamid);
             }
+
+            Puts("here2");
 
             float heightAdj = 0f;
             float blockCollision = 0f;
@@ -556,7 +564,7 @@ namespace Oxide.Plugins
                         {
                             return "checkplaced must be true or false";
                         }
-                        
+
                         break;
                     case "blockcollision":
                         if (!float.TryParse(args[i + 1], out blockCollision))
@@ -584,87 +592,137 @@ namespace Oxide.Plugins
 
             }
 
+            //    Puts("startpos " + startPos.y);
             startPos.y += heightAdj;
+            //   Puts("startpos " + startPos.y);
 
-            var preloadData = PreLoadData(data["entities"] as List<object>, startPos, RotationCorrection, deployables, inventories);
-            if(autoHeight)
+
+            //   Puts("startpos " + startPos);
+            //   CreateSphere(startPos, 0.2f);
+
+            var preloadData = PreLoadData(data["entities"] as List<object>, startPos,
+                RotationCorrection, deployables, inventories);
+            if (autoHeight)
             {
                 var bestHeight = FindBestHeight(preloadData, startPos);
                 if (bestHeight is string)
                 {
                     return bestHeight;
                 }
-                heightAdj = (float)bestHeight - startPos.y;
+
+                Puts("bestHeight " + bestHeight);
+                //    CreateSphere(new Vector3(startPos.x,(float)bestHeight, startPos.z), 0.3f);
+                heightAdj = (float)bestHeight - startPos.y + heightAdj;
+                //    Puts("heightAdj " + heightAdj);
                 FixPreloadData(preloadData, heightAdj);
             }
 
             if (blockCollision > 0f)
             {
-                var collision = CheckCollision(preloadData, startPos,blockCollision);
-                if(collision is string)
+                var collision = CheckCollision(preloadData, startPos, blockCollision);
+                if (collision is string)
                 {
                     return collision;
                 }
             }
 
-            return Paste(preloadData, startPos, player, checkPlaced);
+            if (preview)
+            {
+                return preloadData;
+            }
+            else
+            {
+                return Paste(preloadData, startPos, player, checkPlaced);
+            }
         }
         object GetGround(Vector3 pos)
         {
             RaycastHit hitInfo;
-            if (Physics.Raycast(pos, Vector3.up, out hitInfo, groundLayer))
+            if (Physics.Raycast(pos, Vector3.up, out hitInfo, Mathf.Infinity, terrainLayer))
             {
+                Puts("up point " + hitInfo.point + " for point " + pos);
+                Puts("hit up point");
+                //CreateSphere(hitInfo.point, 1f);
                 return hitInfo.point;
             }
-            if (Physics.Raycast(pos, Vector3.down, out hitInfo, groundLayer))
+            if (Physics.Raycast(pos, Vector3.down, out hitInfo, Mathf.Infinity, terrainLayer))
             {
+                Puts("down point " + hitInfo.point + " for point " + pos);
+                Puts("hit down point");
+                //CreateSphere(hitInfo.point, 1f);
                 return hitInfo.point;
             }
             return null;
         }
-        object FindBestHeight(List<Dictionary<string,object>> entities, Vector3 startPos)
+
+
+
+        object FindBestHeight(List<Dictionary<string, object>> entities, Vector3 startPos)
         {
-            float minHeight = 0f;
-            float maxHeight = 0f;
-            foreach(var entity in entities)
+            float minHeight = 999f;
+            float maxHeight = -999f;
+
+
+            foreach (var entity in entities)
             {
-                if(((string)entity["prefabname"]).Contains("/foundation/"))
+                if (((string)entity["prefabname"]).Contains("/foundation/"))
                 {
                     var foundHeight = GetGround((Vector3)entity["position"]);
-                    if(foundHeight != null)
+                    if (foundHeight != null)
                     {
                         var height = (Vector3)foundHeight;
+                        //  CreateSphere((Vector3)entity["position"], 1f);
+                        // CreateSphere(height, 1f);
+                        // Puts("((Vector3)entity[position]) " + 
+                        //        ((Vector3)entity["position"]).y.ToString("F3"));
+                        //    Puts("height.y                    " + height.y);
                         if (height.y > maxHeight) maxHeight = height.y;
                         if (height.y < minHeight) minHeight = height.y;
+                        //     Puts("maxHeight                   " + maxHeight);
+                        //    Puts("minHeight                   " + minHeight);
                     }
                 }
             }
             if (maxHeight - minHeight > 3f) return "The ground is too steep";
+            Puts("returning maxheight " + maxHeight);
+            Puts("returning minHeight " + minHeight);
             return maxHeight;
         }
-        void FixPreloadData(IList<Dictionary<string,object>> entities, float heightAdj)
+        void FixPreloadData(IList<Dictionary<string, object>> entities, float heightAdj)
         {
-            foreach(var entity in entities)
+            foreach (var entity in entities)
             {
                 var pos = ((Vector3)entity["position"]);
                 pos.y += heightAdj;
                 entity["position"] = pos;
             }
         }
-        List<Dictionary<string, object>> PreLoadData(List<object> entities, Vector3 startPos, float RotationCorrection, bool deployables, bool inventories)
+        List<Dictionary<string, object>> PreLoadData(List<object> entities, Vector3 startPos,
+            float RotationCorrection, bool deployables, bool inventories)
         {
             var eulerRotation = new Vector3(0f, RotationCorrection, 0f);
             var quaternionRotation = Quaternion.EulerRotation(eulerRotation);
             var preloaddata = new List<Dictionary<string, object>>();
-            foreach(var entity in entities)
+            foreach (var entity in entities)
             {
                 var data = entity as Dictionary<string, object>;
                 if (!deployables && !data.ContainsKey("grade")) continue;
                 var pos = (Dictionary<string, object>)data["pos"];
                 var rot = (Dictionary<string, object>)data["rot"];
-                var fixedRotation = Quaternion.EulerRotation(eulerRotation + new Vector3(Convert.ToSingle(rot["x"]), Convert.ToSingle(rot["y"]), Convert.ToSingle(rot["z"])));
-                var tempPos = quaternionRotation * (new Vector3(Convert.ToSingle(pos["x"]), Convert.ToSingle(pos["y"]), Convert.ToSingle(pos["z"])));
+                var fixedRotation = Quaternion.EulerRotation(eulerRotation +
+                    new Vector3(Convert.ToSingle(rot["x"]),
+                    Convert.ToSingle(rot["y"]), Convert.ToSingle(rot["z"])));
+                var tempPos = quaternionRotation * (new Vector3(Convert.ToSingle(pos["x"]),
+                    Convert.ToSingle(pos["y"]), Convert.ToSingle(pos["z"])));
                 Vector3 newPos = tempPos + startPos;
+                //Puts("tempPos in preload    " + tempPos.ToString("F3"));
+                //Puts("startpos in preload   " + startPos.ToString("F3"));
+                //Puts("newPos in preload     " + newPos.ToString("F3"));
+                //Puts("pos.x in preload      " + Convert.ToSingle(pos["x"]));
+                //Puts("pos.y in preload      " + Convert.ToSingle(pos["y"]));
+                //Puts("pos.z in preload      " + Convert.ToSingle(pos["z"]));
+                //Puts("");
+
                 data.Add("position", newPos);
                 data.Add("rotation", fixedRotation);
                 if (!inventories && data.ContainsKey("items")) data["items"] = new List<object>();
@@ -672,6 +730,48 @@ namespace Oxide.Plugins
             }
             return preloaddata;
         }
+
+        private const string SphereEnt = "assets/prefabs/visualization/sphere.prefab";
+        public static BaseEntity CreateSphere(Vector3 position, float radius)
+        {
+            // Puts("CreateSphere works!");
+            BaseEntity sphere = GameManager.server.CreateEntity(SphereEnt,
+                position, new Quaternion(), true);
+            SphereEntity ent = sphere.GetComponent<SphereEntity>();
+            //iemUtils.Puts("prefabID " + sphere.prefabID);
+
+            ent.currentRadius = radius;
+            ent.lerpSpeed = 0f;
+            sphere?.Spawn();
+            return sphere;
+
+        }
+        public static void DestroyAllSpheres()
+        {
+
+            //Vis.Entit
+            //Puts("  >>>>>>Destroy all spheres");
+
+            //foreach (SphereEntity se in BaseEntity.FindObjectsOfType<SphereEntity> ()) {
+            //se.KillMessage ();
+            //Puts ("here");
+            //}
+
+            var foundentities = UnityEngine.Object.FindObjectsOfType<BaseEntity>();
+            uint prefabID = 2327559662;
+            foreach (var entity in foundentities)
+            {
+                if (entity.prefabID == prefabID)
+                {
+                    // Puts("found entity with prefabID "
+                    //          + entity.prefabID.ToString());
+
+                    entity.KillMessage();
+                    //entity.Kill ();
+                }
+            }
+        }
+
         void TryPasteLock(BaseEntity lockableEntity, Dictionary<string, object> structure)
         {
             BaseEntity lockentity = null;
@@ -710,28 +810,29 @@ namespace Oxide.Plugins
                 }
             }
         }
-        object CheckCollision(List<Dictionary<string,object>> entities, Vector3 startPos, float radius)
+        object CheckCollision(List<Dictionary<string, object>> entities, Vector3 startPos, float radius)
         {
             foreach (var entityobj in entities)
             {
                 var pos = (Vector3)entityobj["position"];
                 var rot = (Quaternion)entityobj["rotation"];
 
-                foreach(var collider in Physics.OverlapSphere(pos, radius, collisionLayer))
+                foreach (var collider in Physics.OverlapSphere(pos, radius, collisionLayer))
                 {
-                    return string.Format("Something is blocking the paste ({0})",collider.gameObject.name.ToString());
+                    return string.Format("Something is blocking the paste ({0})", collider.gameObject.name.ToString());
                 }
-                
+
             }
             return true;
         }
 
-        List<BaseEntity> Paste(List<Dictionary<string,object>> entities, Vector3 startPos, BasePlayer player, bool checkPlaced)
+        List<BaseEntity> Paste(List<Dictionary<string, object>> entities, Vector3 startPos,
+            BasePlayer player, bool checkPlaced, bool preview = false)
         {
             bool unassignid = true;
             uint buildingid = 0;
             var pastedEntities = new List<BaseEntity>();
-            foreach(var data in entities)
+            foreach (var data in entities)
             {
                 try
                 {
@@ -857,7 +958,7 @@ namespace Oxide.Plugins
                         pastedEntities.Add(entity);
                     }
                 }
-                catch(Exception e)
+                catch (Exception e)
                 {
                     PrintError(string.Format("Trying to paste {0} send this error: {1}", data["prefabname"].ToString(), e.Message));
                 }
@@ -885,7 +986,7 @@ namespace Oxide.Plugins
 
         object Undo(List<BaseEntity> entities)
         {
-            foreach(var entity in entities)
+            foreach (var entity in entities)
             {
                 if (entity == null) continue;
                 if (entity.isDestroyed) continue;
@@ -917,7 +1018,7 @@ namespace Oxide.Plugins
             }
 
             if (lastPastes.ContainsKey(steamid)) lastPastes.Remove(steamid);
-            lastPastes.Add(steamid,(List<BaseEntity>)success);
+            lastPastes.Add(steamid, (List<BaseEntity>)success);
 
             SendReply(player, GetMsg("You've successfully pasted the structure.", steamid));
         }
@@ -969,10 +1070,11 @@ namespace Oxide.Plugins
             if (args == null || args.Length == 0) { SendReply(player, GetMsg("Syntax: /copy TARGETFILENAME options values\r\n radius XX (default 3)\r\n mechanics proximity/building (default building)\r\nbuilding true/false (saves structures or not)\r\ndeployables true/false (saves deployables or not)\r\ninventories true/false (saves inventories or not)", player.userID.ToString())); return; }
             var savename = args[0];
 
-            
+
             var success = TryCopyFromPlayer(player, savename, args.Skip(1).ToArray());
 
-            if(success is string) {
+            if (success is string)
+            {
                 SendReply(player, (string)success);
                 return;
             }
