@@ -141,6 +141,7 @@ namespace Oxide.Plugins
             public string TileImgUrl { get; set; }
             public bool Enabled { get; set; }
             public bool HasDifficultyModes { get; set; }
+            public bool HasActiveDetailScreen { get; set; }
             public Dictionary<string, IemGameBase.DifficultyMode> difficultyModes { get; set; }
             public bool HasStats { get; set; }
             public bool HasGameStats { get; set; }
@@ -161,6 +162,12 @@ namespace Oxide.Plugins
                 difficultyModes = new Dictionary<string, IemGameBase.DifficultyMode>();
                 HasDifficultyModes = false;
                 HasGameStats = false;
+                HasActiveDetailScreen = false;
+            }
+
+            public virtual List<IemUI.BaseElement> GetActiveDetailScreen()
+            {
+                return null;
             }
 
             // player who is requesting the game, if its a solo, individual game
@@ -391,13 +398,16 @@ namespace Oxide.Plugins
             public virtual bool CleanUp()
             {
                 //CurrentState = IemUtils.State.Cancelled;
+                me.Puts("here");
                 foreach (var gamezone in gamezones.Values)
                 {
                     gamezone.Remove();
                 }
+                me.Puts("here2");
                 foreach (var iemplayer in Players.Values)
                 {
                     CuiHelper.DestroyUi(BasePlayer.Find(iemplayer.PlayerId), "ConfirmCancel");
+                    me.Puts("here3");
                     if (IemUI.confirms.ContainsKey(iemplayer.PlayerId))
                     {
                         IemUI.confirms.Remove(iemplayer.PlayerId);

@@ -11,7 +11,7 @@ namespace Oxide.Plugins
 {
     [Info("Incursion UI Class", "tolland", "0.1.0")]
 
-    class IemUI : RustPlugin
+    public class IemUI : RustPlugin
     {
 
         #region header 
@@ -47,8 +47,21 @@ namespace Oxide.Plugins
             //if the server restarted during a banner, these need to be removed
             RemoveUIs();
             IemUtils.LogL("IncursionUI: on server initialized");
+            foreach (var player in BasePlayer.activePlayerList)
+            {
+                CheckPlayer(player);
+            }
+        }
 
+        void CheckPlayer(BasePlayer player)
+        {
+            player.SendConsoleCommand("bind y iem.ui confirm_ok");
+            player.SendConsoleCommand("bind n iem.ui confirm_cancel");
+        }
 
+        void OnSleepEnded(BasePlayer player)
+        {
+            CheckPlayer(player);
         }
 
         #endregion
@@ -214,6 +227,10 @@ namespace Oxide.Plugins
             };
             elements.Add(textElement);
             CuiHelper.AddUi(player, elements);
+
+            me.timer.Once(5f, () => {
+                CuiHelper.DestroyUi(player, "CreateFadeoutBanner");
+            });
 
         }
 
@@ -612,6 +629,94 @@ namespace Oxide.Plugins
             CuiHelper.AddUi(player, elements);
         }
 
+        public static void ConfirmCancelYN(BasePlayer player, string message,
+           string confirmMsg, string cancelMsg,
+           Action confirmCode, Action cancelCode, bool lowprofile = false)
+        {
+            confirms[player.UserIDString] = new ConfirmCancelBlock
+            {
+                confirmMethod = confirmCode,
+                cancelMethod = cancelCode
+            };
+
+            string ARENA = $"{message}";
+            IemUtils.DLog(message);
+            string gui = "ConfirmCancel";
+            guiList.Add(gui);
+
+            CuiHelper.DestroyUi(player, gui);
+
+            var elements = new CuiElementContainer();
+
+            var AnchorMinVal = "";
+            var AnchorMaxVal = "";
+            if (lowprofile)
+            {
+                AnchorMinVal = "0.3 0.1";
+                AnchorMaxVal = "0.7 0.3";
+            }
+            else
+            {
+                AnchorMinVal = "0.3 0.3";
+                AnchorMaxVal = "0.7 0.7";
+            }
+            var mainName = elements.Add(new CuiPanel
+            {
+                Image =
+                {
+                    Color = "0.1 0.1 0.1 0.5"
+                },
+                RectTransform =
+                {
+                    AnchorMin = AnchorMinVal,
+                    AnchorMax = AnchorMaxVal
+                },
+                CursorEnabled = false
+            }, "Hud.Under", gui);
+
+            elements.Add(new CuiLabel
+            {
+                Text = {
+                    Text = "Press Y",
+                    FontSize = 22,
+                    Align = TextAnchor.MiddleCenter
+    },
+                RectTransform = {
+                    AnchorMin = "0.6 0.2",
+                    AnchorMax = "0.85 0.4"
+                }
+            }, mainName);
+
+            elements.Add(new CuiLabel
+            {
+                Text = {
+                    Text = "Press N",
+                    FontSize = 22,
+                    Align = TextAnchor.MiddleCenter
+                },
+                RectTransform = {
+                    AnchorMin = "0.15 0.2",
+                    AnchorMax = "0.40 0.4"
+                }
+            }, mainName);
+
+            elements.Add(new CuiLabel
+            {
+                Text = {
+                    Text = message,
+                    FontSize = 22,
+                    Align = TextAnchor.MiddleCenter
+    },
+                RectTransform = {
+                    AnchorMin = "0.15 0.45",
+                    AnchorMax = "0.85 0.95"
+                }
+            }, mainName);
+
+
+            CuiHelper.AddUi(player, elements);
+        }
+
         public static void ConfirmCancel(BasePlayer player, string message,
            string confirmMsg, string cancelMsg,
            Action confirmCode, Action cancelCode, bool lowprofile = false)
@@ -637,7 +742,7 @@ namespace Oxide.Plugins
             if (lowprofile)
             {
                 AnchorMinVal = "0.3 0.1";
-                AnchorMaxVal = "0.7 0.3";                
+                AnchorMaxVal = "0.7 0.3";
             }
             else
             {
@@ -1144,6 +1249,47 @@ namespace Oxide.Plugins
 
         #endregion
 
+        #region base element
+
+        public enum ElementType
+        {
+            OutlineText,
+            Panel,
+            Button,
+            Image,
+            Label,
+            TextBox
+        }
+
+
+        public class BaseElement
+        {
+            public ElementType type { get; set; }
+            public string Text { get; set; }
+            public int FontSize { get; set; }
+            public string ImgUrl { get; set; }
+            public string Command { get; set; }
+            public bool Close { get; set; }
+            public float xmin { get; set; }
+            public float xmax { get; set; }
+            public float ymin { get; set; }
+            public float ymax { get; set; }
+            public string color { get; set; }
+            public string backcolor { get; set; }
+            public TextAnchor align { get; set; }
+
+            public BaseElement()
+            {
+                FontSize = 40;
+                Text = "";
+                color = "1 1 1 1";
+                backcolor = "0.1 0.1 0.1 0.6";
+                align = TextAnchor.MiddleLeft;
+            }
+
+        }
+
+        #endregion
 
     }
 }

@@ -235,8 +235,12 @@ namespace Oxide.Plugins
             foreach (KitItem kitem in kit.items)
             {
                 if (kitem.weapon)
-                    player.inventory.GiveItem(BuildWeapon(kitem.itemid, kitem.skinid, kitem.mods), kitem.container == "belt" ? player.inventory.containerBelt : kitem.container == "wear" ? player.inventory.containerWear : player.inventory.containerMain);
-                else player.inventory.GiveItem(BuildItem(kitem.itemid, kitem.amount,  kitem.skinid), kitem.container == "belt" ? player.inventory.containerBelt : kitem.container == "wear" ? player.inventory.containerWear : player.inventory.containerMain);
+                    player.inventory.GiveItem(BuildWeapon(kitem.itemid, kitem.skinid, kitem.mods), 
+                        kitem.container == "belt" ? player.inventory.containerBelt : kitem.container == "wear" 
+                        ? player.inventory.containerWear : player.inventory.containerMain);
+                else player.inventory.GiveItem(BuildItem(kitem.itemid, kitem.amount,  kitem.skinid), 
+                    kitem.container == "belt" ? player.inventory.containerBelt : kitem.container == "wear" ? 
+                    player.inventory.containerWear : player.inventory.containerMain);
 
             }
             if (kit.building != null && kit.building != string.Empty)

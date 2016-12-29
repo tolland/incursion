@@ -10,7 +10,7 @@ using Oxide.Core.Plugins;
 using Oxide.Game.Rust.Cui;
 using Rust;
 using UnityEngine;
-
+ 
 namespace Oxide.Plugins
 {
     [Info("Incursion Maze Challenge", "tolland", "0.1.0")]
@@ -76,13 +76,6 @@ namespace Oxide.Plugins
             //IemUtils.LogL("IemGameTargetPractice: OnServerInitialized complete");
         }
 
-        //void LoadDefaultConfig()
-        //{
-        //    Config.Clear();
-        //    Config["Enabled"] = false;
-        //    Config.Save();
-        //}
-
         public delegate void EnteredZone(string ZoneID, BasePlayer player);
         private static EnteredZone PlayerEnteredZone = delegate { };
 
@@ -143,6 +136,13 @@ namespace Oxide.Plugins
             //pregame level is -1
             public int level = -1;
 
+            public Timer walltimer;
+
+            public List<IemObjectPlacement.CopyPastePlacement> mazes = new List<IemObjectPlacement.CopyPastePlacement>();
+            public Vector3 startLoc;
+            public Vector3 endLoc;
+
+
             public IemGameMazeChallengeGame(BasePlayer newPlayer) : base(newPlayer)
             {
                 Name = "Maze Challenge";
@@ -150,10 +150,10 @@ namespace Oxide.Plugins
                 Mode = "Solo";
 
                 gamelevels = new List<IemGameBase.GameLevel>(
-                new IemGameBase.GameLevel[] {
-                new IemGameBase.GameLevel {Game=this},
-                new IemGameBase.GameLevel {Game=this},
-            });
+                        new IemGameBase.GameLevel[] {
+                        new IemGameBase.GameLevel {Game=this},
+                        new IemGameBase.GameLevel {Game=this},
+                    });
 
                 gsm = new MazeChallengeStateManager(
                     MazeChallengeStateManager.Created.Instance, this);
@@ -201,27 +201,6 @@ namespace Oxide.Plugins
                 return true;
             }
 
-            public bool MovePlayerToTeamLocation(BasePlayer player, Vector3 location)
-            {
-                IemUtils.GLog("moving players to game location: " + location);
-
-                if (player.IsSleeping())
-                {
-                    player.EndSleeping();
-                }
-                if (player.IsWounded())
-                {
-                    IemUtils.SetMetabolismValues(player);
-                    player.SetPlayerFlag(BasePlayer.PlayerFlags.Wounded, false);
-                    player.CancelInvoke("WoundingTick");
-                }
-
-                if (!IemUtils.CheckPointNearToLocation(player.transform.position, location, 2))
-                    IemUtils.TeleportPlayerPosition(player, location);
-
-                return true;
-            }
-
             public void PlayerImmortal(BaseCombatEntity entity, HitInfo hitInfo)
             {
                 if (entity as BasePlayer == null || hitInfo == null) return;
@@ -246,6 +225,7 @@ namespace Oxide.Plugins
                     }
                     else
                     {
+                        IemUI.CreateFadeoutBanner(player, "Level Complete");
                         gsm?.ChangeState(MazeChallengeStateManager.GameRunning.Instance);
                     }
                 }
@@ -265,10 +245,7 @@ namespace Oxide.Plugins
         public class MazeChallengeStateManager : IemStateManager.StateManager
         {
 
-            public List<IemObjectPlacement.CopyPastePlacement> mazes = new List<IemObjectPlacement.CopyPastePlacement>();
             private IemGameMazeChallengeGame eg;
-            private Vector3 startLoc;
-            private Vector3 endLoc;
 
             Vector3 location = me.IemUtils.NextFreeLocation();
 
@@ -278,10 +255,10 @@ namespace Oxide.Plugins
                 eg = newEg;
             }
 
-            private Timer walltimer;
+            //private Timer walltimer;
 
             public class Created : IemStateManager.StateBase<Created>,
-     IemStateManager.IStateMachine
+                    IemStateManager.IStateMachine
             {
                 public new void Enter(IemStateManager.StateManager sm)
                 { }
@@ -335,7 +312,7 @@ namespace Oxide.Plugins
                 public new void Exit(IemStateManager.StateManager sm)
                 {
                     MazeChallengeStateManager gsm = (MazeChallengeStateManager)sm;
-                    gsm.walltimer?.Destroy();
+                    gsm.eg.walltimer?.Destroy();
                     EntitiesTakingDamage -= gsm.eg.PlayerImmortal;
                     CuiHelper.DestroyUi(gsm.eg.player, "ShowIntroOverlay");
 
@@ -360,17 +337,9 @@ namespace Oxide.Plugins
                         me.Puts("location is null");
                     }
 
-                    gsm.mazes.Add(
+                    gsm.eg.mazes.Add(
                          new IemObjectPlacement.CopyPastePlacement(
                        "maze_v1", location));
-
-                    var objs = IemUtils.FindComponentsNearToLocation<WaterCatcher>(location, 100);
-                    foreach (var item in objs)
-                    {
-                        me.Puts("location is " + item.transform.position);
-                    }
-
-
 
                     WaterCatcher obj = IemUtils.FindComponentNearestToLocation<WaterCatcher>(location, 50);
 
@@ -381,11 +350,14 @@ namespace Oxide.Plugins
                     else
                     {
                         me.Puts("start is located at " + obj.transform.position);
-                        gsm.startLoc = obj.transform.position;
+                        gsm.eg.startLoc = obj.transform.position;
+
+                        IemUtils.CreateSphere(gsm.eg.startLoc, fade: true);
+
                         obj.Kill(BaseNetworkable.DestroyMode.None);
                     }
                     LiquidContainer lc = IemUtils.FindComponentNearestToLocation<LiquidContainer>(
-                        location, 50, "waterbarrel"); 
+                        location, 50, "waterbarrel");
 
                     if (lc == null)
                     {
@@ -394,15 +366,15 @@ namespace Oxide.Plugins
                     else
                     {
                         me.Puts("end is located at " + lc.transform.position);
-                        gsm.endLoc = lc.transform.position + new Vector3(0, 1.9f, 0);
+                        gsm.eg.endLoc = lc.transform.position + new Vector3(0, 1.9f, 0);
                         lc.Kill(BaseNetworkable.DestroyMode.None);
 
                         gsm.eg.AddGameZone(
                             "mc1_endpoint_" + (gsm.eg.level + 1) + "_" + gsm.eg.GetGuid(),
-                            gsm.endLoc, 2);
+                            gsm.eg.endLoc, 2);
 
                     }
-                    gsm.eg.MovePlayerToTeamLocation(gsm.eg.player, gsm.startLoc);
+                    IemUtils.MovePlayerToTeamLocation(gsm.eg.player, gsm.eg.startLoc);
 
                     IemUtils.PlaySound(gsm.eg.player);
                     IemUI.CreateGameBanner(gsm.eg.player, "Level " + (gsm.eg.level + 1));
@@ -415,7 +387,7 @@ namespace Oxide.Plugins
                     //me.timer.Once(3f, () =>
                     //{
                     gsm.eg.gamelevels[gsm.eg.level].returnZone =
-                    new IemUtils.ReturnZone(location, gsm.startLoc, gsm.eg.player);
+                    new IemUtils.ReturnZone(location, gsm.eg.startLoc, gsm.eg.player);
                     //});
 
                     // it looks like there are some lag issues relating to repawning
@@ -437,8 +409,8 @@ namespace Oxide.Plugins
                     EntitiesTakingDamage -= gsm.eg.PlayerImmortal;
                     PlayerEnteredZone -= gsm.eg.PlayerEnteredEndZone;
 
-                    me.Puts("GAME LEVel count is " + gsm.eg.gamelevels.Count);
-                    me.Puts("GAME LEVel is " + (gsm.eg.level + 1));
+                    me.Puts("Game Level count is " + gsm.eg.gamelevels.Count);
+                    me.Puts("Game Level is " + (gsm.eg.level + 1));
 
                     gsm.eg.RemoveGameZone(
                             "mc1_endpoint_" + (gsm.eg.level + 1) + "_" + gsm.eg.GetGuid());
@@ -495,7 +467,6 @@ namespace Oxide.Plugins
             }
 
 
-
             public class CleanUp : IemStateManager.StateBase<CleanUp>,
                 IemStateManager.IStateMachine
             {
@@ -504,11 +475,13 @@ namespace Oxide.Plugins
                     MazeChallengeStateManager gsm = (MazeChallengeStateManager)sm;
 
                     me.Puts("moving player to " + gsm.eg.iemPlayer.PreviousLocation);
-                    gsm.eg.MovePlayerToTeamLocation(gsm.eg.player,
+
+                    IemUtils.MovePlayerToTeamLocation(gsm.eg.player,
                         gsm.eg.iemPlayer.PreviousLocation);
+
                     me.IemUtils.RestoreInventory(gsm.eg.player, gsm.eg.GetGuid());
 
-                    foreach (var maze in gsm.mazes)
+                    foreach (var maze in gsm.eg.mazes)
                     {
                         maze.Remove();
                     }
@@ -570,7 +543,7 @@ namespace Oxide.Plugins
                 case "look":
                     //LiquidContainer obj = IemUtils.FindComponentNearestToLocation<LiquidContainer>(location, 50);
                     LiquidContainer obj = IemUtils.FindComponentNearestToLocation<LiquidContainer>(
-                        arg.Player().transform.position, 50, "waterbarrel"); 
+                        arg.Player().transform.position, 50, "waterbarrel");
 
                     if (obj == null)
                     {
@@ -581,15 +554,15 @@ namespace Oxide.Plugins
                         IemUtils.DestroyAllSpheres();
                         me.Puts("start is located at " + obj.transform.position);
                         IemUtils.CreateSphere(obj.transform.position, 1.2f);
-                     //   gsm.startLoc = obj.transform.position;
-                     //   obj.Kill(BaseNetworkable.DestroyMode.None);
+                        //   gsm.startLoc = obj.transform.position;
+                        //   obj.Kill(BaseNetworkable.DestroyMode.None);
                     }
 
                     break;
                 case "find":
                     var foundentities = IemUtils.FindComponentsNearToLocation<LiquidContainer>(
                         arg.Player().transform.position, 50, "waterbarrel");
-                    
+
                     foreach (var entity in foundentities)
                     {
                         me.Puts("type " + entity.GetType());

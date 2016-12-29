@@ -312,54 +312,54 @@ namespace Oxide.Plugins
 
         public static void DLog(string message)
         {
-            Server.Log("oxide/logs/ESMlog.txt", message);
+            ConVar.Server.Log("oxide/logs/ESMlog.txt", message);
             iemUtils.Puts(message);
             //Interface.Oxide.LogInfo("[{0}] {1}", (object)this.Title, (object)(args.Length <= 0 ? format : string.Format(format, args)));
         }
 
         public static void SLog(string strMessage)
         {
-            Server.Log("oxide/logs/Statelog.txt", strMessage);
+            ConVar.Server.Log("oxide/logs/Statelog.txt", strMessage);
             //string strFilename = "oxide/logs/Statelog.txt";
-            ////iemUtils.Puts(message);
+            //iemUtils.Puts(strMessage);
             //File.AppendAllText(string.Format("{0}/{1}", (object)ConVar.Server.rootFolder, (object)strFilename), string.Format("[{0}] {1}\r\n", (object)DateTime.Now.ToString(), (object)strMessage));
         }
 
         public static void DDLog(string message)
         {
-            Server.Log("oxide/logs/DDlog.txt", message);
+            ConVar.Server.Log("oxide/logs/DDlog.txt", message);
             //iemUtils.Puts(message);
         }
 
         public static void GLog(string message)
         {
-            Server.Log("oxide/logs/Glog.txt", message);
+            ConVar.Server.Log("oxide/logs/Glog.txt", message);
             //iemUtils.Puts(message);
         }
 
         public static void SchLog(string message)
         {
-            Server.Log("oxide/logs/schedlog.txt", message);
+            ConVar.Server.Log("oxide/logs/schedlog.txt", message);
             //iemUtils.Puts(message);
         }
 
         public static void TimerLog(string message)
         {
-            Server.Log("oxide/logs/timerlog.txt", message);
+            ConVar.Server.Log("oxide/logs/timerlog.txt", message);
             //iemUtils.Puts(message);
         }
 
         public static void hitLog(string message)
         {
-            Server.Log("oxide/logs/hitlog.txt", message);
+            ConVar.Server.Log("oxide/logs/hitlog.txt", message);
             //iemUtils.Puts(message);
             //Interface.Oxide.LogInfo("[{0}] {1}", (object)this.Title, (object)(args.Length <= 0 ? format : string.Format(format, args)));
         }
 
         public static void LogL(string message)
         {
-            Server.Log("oxide/logs/Loadlog.txt", message);
-            Server.Log("oxide/logs/ESMlog.txt", message);
+            ConVar.Server.Log("oxide/logs/Loadlog.txt", message);
+            ConVar.Server.Log("oxide/logs/ESMlog.txt", message);
             //iemUtils.Puts(message);
         }
 
@@ -466,7 +466,16 @@ namespace Oxide.Plugins
 
         private const string SphereEnt = "assets/prefabs/visualization/sphere.prefab";
 
-        public static BaseEntity CreateSphere(Vector3 position, float radius)
+        public static void DrawSphere(BasePlayer player, Vector3 position,
+            float radius = 0.5f,
+            Color? color = null)
+        {
+            color = color ?? Color.blue;
+            int time = 30;
+            player.SendConsoleCommand("ddraw.sphere", time, color, position, radius);
+        }
+
+        public static BaseEntity CreateSphere(Vector3 position, float radius = 1, bool fade = false)
         {
             // Puts("CreateSphere works!");
             BaseEntity sphere = GameManager.server.CreateEntity(SphereEnt,
@@ -477,8 +486,16 @@ namespace Oxide.Plugins
             ent.currentRadius = radius;
             ent.lerpSpeed = 0f;
             sphere?.Spawn();
-            return sphere;
 
+            if (fade)
+            {
+                me.timer.Once(30f, () =>
+                {
+                    sphere.KillMessage();
+                });
+            }
+
+            return sphere;
         }
 
 
@@ -542,7 +559,7 @@ namespace Oxide.Plugins
                 int radius = 50)
             {
                 _guid = Guid.NewGuid();
-                zoneid = GetGuid().ToString();
+                zoneid = "return_zone-" + GetGuid().ToString();
                 this.radius = radius;
 
                 iemUtils.ZoneManager.Call("CreateOrUpdateZone",
@@ -662,7 +679,8 @@ namespace Oxide.Plugins
         static int collisionLayer = LayerMask.GetMask("Construction", "Construction Trigger",
             "Trigger", "Deployed", "Default");
 
-        public static List<T> FindComponentsNearToLocation<T>(Vector3 location, int radius, string prefab = null)
+        public static List<T> FindComponentsNearToLocation<T>(Vector3 location,
+            int radius, string prefab = null)
         {
             //List<T> components = new List<T>();
 
@@ -677,55 +695,106 @@ namespace Oxide.Plugins
             return components.ToList();
         }
 
+        private readonly int buildingLayer = LayerMask.GetMask("Terrain", "World", "Construction", "Deployed");
+        private readonly int blockLayer = LayerMask.GetMask("Construction");
+
+        private readonly Collider[] colBuffer = (Collider[])typeof(Vis).GetField("colBuffer",
+            (BindingFlags.Static | BindingFlags.NonPublic)).GetValue(null);
+
         // TODO maybe find the nearest collider?
-        public static T FindComponentNearestToLocation<T>(Vector3 location, int radius, string prefab = null) 
+        public static T FindComponentNearestBuildingBlock<T>(Vector3 location,
+            int radius = 5,
+            string prefab = null)
+            where T : BaseEntity
+        {
+            return null;
+        }
+
+        // TODO maybe find the nearest collider?
+        public static T FindComponentNearestToLocation<T>(Vector3 location,
+            int radius = 5,
+            string prefab = null)
             where T : BaseEntity
         {
             T component = default(T);
 
-            // IemUtils.DDLog("in search at location " + location);
+            IemUtils.DLog("in search at location " + location);
+            IemUtils.DLog("searching for a " + typeof(T).Name);
+
+            Collider[] colBuffer = null;
+
 
             float dist = 9999;
-            foreach (Collider col in Physics.OverlapSphere(location, radius))
+            foreach (Collider collider in Physics.OverlapSphere(location, radius))
             {
-                // IemUtils.DDLog("collider " + col.name);
-                if (col.GetComponentInParent<T>() == null) continue;
 
-                //IemUtils.DDLog("not null collider " + col.GetComponentInParent<T>().ToString());
-
-                //IemUtils.DDLog("colx=" + col.transform.position.x);
-                //IemUtils.DDLog("locx=" + location.x);
-                //IemUtils.DDLog("coly=" + col.transform.position.y);
-                //IemUtils.DDLog("locy=" + location.y);
-                //IemUtils.DDLog("colz=" + col.transform.position.z);
-                //IemUtils.DDLog("locz=" + location.z);
-
-
-
-                float tempdist = Vector3.Distance(location, col.transform.position);
-
-                var temp = col.GetComponentInParent<T>();
-                //IemUtils.DDLog("dist is " + tempdist);
-
-                if (prefab != null)
+                if (collider.transform != null && collider.transform.CompareTag("MeshColliderBatch"))
                 {
-                    if (!temp.LookupPrefab().name.ToLower().Contains(prefab.ToLower()))
+
+                    var batch = collider.transform.GetComponent<MeshColliderBatch>();
+                    var instances = (ListDictionary<Component, ColliderCombineInstance>)instancesField.GetValue(batch);
+
+                    foreach (var item in instances.Values)
                     {
-                        me.Puts("prefab " + temp.LookupPrefab().name);
-                        continue;
+                        var buildingBlock = item.collider?.GetComponentInParent<T>();
+                        if (buildingBlock)
+                        {
+                            float tempdist = Vector3.Distance(location, buildingBlock.transform.position);
+                            //  me.Puts("in building block, tempdist is "+tempdist+" dist is "+dist);
+                            if (prefab != null)
+                            {
+                                me.Puts("prefab is " + prefab);
+                                if (!buildingBlock.LookupPrefab().name.ToLower().Contains(prefab.ToLower()))
+                                {
+                                    // me.Puts("prefab " + buildingBlock.LookupPrefab().name);
+                                    continue;
+                                }
+                            }
+                            if (tempdist < dist)
+                            {
+                                dist = tempdist;
+                                component = buildingBlock;
+                                // me.Puts("updated tempdist to "+buildingBlock.ToString());
+                            }
+                        }
                     }
                 }
-
-                if (tempdist < dist)
+                else
                 {
-                    dist = tempdist;
-                    component = temp;
+
+                    float tempdist = Vector3.Distance(location, collider.transform.position);
+
+                    var temp = collider.GetComponentInParent<T>();
+
+                    if (temp != null)
+                    {
+                        if (prefab != null)
+                        {
+                            if (!temp.LookupPrefab().name.ToLower().Contains(prefab.ToLower()))
+                            {
+                                me.Puts("prefab " + temp.LookupPrefab().name);
+                                continue;
+                            }
+                        }
+
+                        if (tempdist < dist)
+                        {
+                            dist = tempdist;
+                            component = temp;
+                        }
+                    }
                 }
 
             }
             if (component != null)
+            {
                 return component;
-            return default(T);
+            }
+            else
+            {
+                me.Puts("was null");
+                return default(T);
+            }
         }
 
 
@@ -941,13 +1010,15 @@ namespace Oxide.Plugins
         public static Vector3 GetGroundY(Vector3 position)
         {
 
-            position = position + Vector3.up;
-            position = position + Vector3.up;
             RaycastHit hitinfo;
-            if (Physics.Raycast(position, Vector3Down, out hitinfo, 100f, groundLayer))
+            if (Physics.Raycast(position, Vector3.down, out hitinfo, 100f, groundLayer))
             {
                 var buf = hitinfo.point;
-                DLog("returning in groundy: " + buf);
+                return buf;
+            }
+            if (Physics.Raycast(position, Vector3.up, out hitinfo, 100f, groundLayer))
+            {
+                var buf = hitinfo.point;
                 return buf;
             }
 
@@ -982,6 +1053,7 @@ namespace Oxide.Plugins
             DLog("teleporting player from " + player.transform.position.ToString());
             //DLog("teleporting player to   " + destination.ToString());
             destination = GetGroundY(destination);
+            DrawSphere(player, destination, color: Color.green);
             player.MovePosition(destination);
             player.ClientRPCPlayer(null, player, "ForcePositionTo", destination);
             player.SetPlayerFlag(BasePlayer.PlayerFlags.ReceivingSnapshot, true);
@@ -1042,8 +1114,11 @@ namespace Oxide.Plugins
             me.teleporting.Remove(player.userID);
         }
 
-        public static bool MovePlayerToTeamLocation(BasePlayer player, Vector3 location)
+        public static bool MovePlayerToTeamLocation(BasePlayer player, Vector3 original)
         {
+            DrawSphere(player, original, color: Color.red);
+            var location = original + Vector3.up;
+            DrawSphere(player, location);
 
             IemUtils.GLog("moving players to game location: " + location);
 
@@ -1304,11 +1379,37 @@ namespace Oxide.Plugins
 
         public enum State
         {
+            /// <summary>
+            /// game is scheduled, but nothing has been setup on the server
+            /// </summary>
+            Scheduled,
+            /// <summary>
+            /// game has been created, resources allocated, and the player might have
+            /// been moved to a game lobby, or be seeing some dialog
+            /// </summary>
             Before,
+            /// <summary>
+            /// game is playing
+            /// </summary>
             Running,
+            /// <summary>
+            /// this is currently not implemented, but its a sub state of running
+            /// </summary>
             Paused,
-            Cancelled,
+            /// <summary>
+            /// The game has ended, but the resources have not been cleaned up
+            /// and the player is potentially in a results dialog, in the post game lobby
+            /// </summary>
             Ended,
+            /// <summary>
+            /// this is a sub state of ended, not currently used, but available to
+            /// distinguish between ended and postgame
+            /// </summary>
+            Postgame,
+            /// <summary>
+            /// the game has been cancelled, and the resources cleaned up
+            /// </summary>
+            Cancelled,
             Complete
         };
 
@@ -1782,6 +1883,69 @@ namespace Oxide.Plugins
 
         #region draw building outlines
 
+        public static void DrawSingleDoorOutline(BasePlayer player,
+             Vector3 point1,
+             Vector3 point2,
+             Vector3 point3,
+             Vector3 point4,
+             Vector3 point5,
+             Vector3 point6,
+             Vector3 point7,
+             Vector3 point8,
+             float time = 3f
+             )
+        {
+
+            player.SendConsoleCommand("ddraw.line", time, Color.blue, point1, point2);
+            player.SendConsoleCommand("ddraw.line", time, Color.blue, point2, point3);
+            player.SendConsoleCommand("ddraw.line", time, Color.blue, point3, point4);
+            player.SendConsoleCommand("ddraw.line", time, Color.blue, point4, point1);
+
+            player.SendConsoleCommand("ddraw.line", time, Color.green, point5, point6);
+            player.SendConsoleCommand("ddraw.line", time, Color.green, point6, point7);
+            player.SendConsoleCommand("ddraw.line", time, Color.green, point7, point8);
+            player.SendConsoleCommand("ddraw.line", time, Color.green, point8, point5);
+            //  player.SendConsoleCommand("ddraw.box", 30f, Color.green, pos + Vector3.up, 2);
+
+        }
+
+        public static void DrawWallOutline(BasePlayer player,
+             Vector3 point1,
+             Vector3 point2,
+             Vector3 point3,
+             Vector3 point4,
+             float time = 3f
+             )
+        {
+
+            player.SendConsoleCommand("ddraw.line", time, Color.blue, point1, point2);
+            player.SendConsoleCommand("ddraw.line", time, Color.blue, point2, point3);
+            player.SendConsoleCommand("ddraw.line", time, Color.blue, point3, point4);
+            player.SendConsoleCommand("ddraw.line", time, Color.blue, point4, point1);
+            //  player.SendConsoleCommand("ddraw.box", 30f, Color.green, pos + Vector3.up, 2);
+
+        }
+
+        public static void DrawDoubleDoorOutline(BasePlayer player,
+             Vector3 point1,
+             Vector3 point2,
+             Vector3 point3,
+             Vector3 point4,
+             Vector3 point5,
+             Vector3 point6,
+             float time = 3f
+             )
+        {
+
+            player.SendConsoleCommand("ddraw.line", time, Color.blue, point1, point2);
+            player.SendConsoleCommand("ddraw.line", time, Color.blue, point2, point3);
+            player.SendConsoleCommand("ddraw.line", time, Color.blue, point3, point4);
+            player.SendConsoleCommand("ddraw.line", time, Color.blue, point4, point1);
+            player.SendConsoleCommand("ddraw.line", time, Color.green, point5, point6);
+            //  player.SendConsoleCommand("ddraw.box", 30f, Color.green, pos + Vector3.up, 2);
+
+        }
+
         public static void DrawFoundation(BasePlayer player,
              Vector3 point1,
              Vector3 point2,
@@ -1814,7 +1978,7 @@ namespace Oxide.Plugins
              Vector3 point5,
              Vector3 point6,
              Vector3 point7,
-             float time=3f
+             float time = 3f
              )
         {
 

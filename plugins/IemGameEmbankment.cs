@@ -49,14 +49,11 @@ namespace Oxide.Plugins
         void Init()
         {
             me = this;
-            //LoadConfigValues();
             IemUtils.LogL("IemGameEmbankment: Init complete");
         }
 
         void Loaded()
         {
-            Unsubscribe(nameof(OnRunPlayerMetabolism));
-
             gm = new EMGameManager();
             IemGameBase.RegisterGameManager(gm);
             IemUtils.LogL("IemGameEmbankment: Loaded complete");
@@ -78,13 +75,6 @@ namespace Oxide.Plugins
             // IemUtils.LogL("IemGameEmbankment: OnServerInitialized complete");
         }
 
-        void LoadDefaultConfig()
-        {
-            Config.Clear();
-            Config["GameLevels"] = false;
-            Config.Save();
-        }
-
         #endregion
 
         #region IemGameEmbankmentGame
@@ -93,11 +83,11 @@ namespace Oxide.Plugins
         {
             public EMGameManager() : base()
             {
-
                 Enabled = true;
                 Mode = "Team";
                 Name = "Embankment";
                 TileImgUrl = "http://www.limepepper.co.uk/images/high_walls_08.jpg";
+                HasActiveDetailScreen = true;
             }
 
 
@@ -105,11 +95,48 @@ namespace Oxide.Plugins
                 string level = null)
             {
                 var newGame = new IemGameEmbankmentGame();
+
                 newGame.Players[player.UserIDString] = new IemEmbankmentPlayer(player, newGame);
+
                 IemUI.ShowTeamUiForPlayer(player, newGame);
+
                 if (!newGame.CanStart())
                     IemUI.CreateGameBanner(player, newGame.CanStartCriteria());
+
                 return newGame;
+            }
+
+            public override List<IemUI.BaseElement> GetActiveDetailScreen()
+            {
+                var elements = new List<IemUI.BaseElement>() { };
+                elements.Add(new IemUI.BaseElement()
+                {
+                    type = IemUI.ElementType.OutlineText,
+                    Text = $"<color=#ffffff>Scheduled games</color>",
+                    xmin = 0.05f,
+                    xmax = 0.75f,
+                    ymin = 0.55f,
+                    ymax = 0.75f
+                });
+                elements.Add(new IemUI.BaseElement()
+                {
+                    type = IemUI.ElementType.TextBox,
+                    Text = $"<color=#ffffff>Scheduled games</color>",
+                    xmin = 0.05f,
+                    xmax = 0.75f,
+                    ymin = 0.5f,
+                    ymax = 0.7f
+                });
+                elements.Add(new IemUI.BaseElement()
+                {
+                    type = IemUI.ElementType.TextBox,
+                    Text = $"<color=#ffffff>games</color>",
+                    xmin = 0.05f,
+                    xmax = 0.75f,
+                    ymin = 0.5f,
+                    ymax = 0.7f
+                });
+                return elements;
             }
         }
          
@@ -117,7 +144,7 @@ namespace Oxide.Plugins
         {
             public IemEmbankmentPlayer(BasePlayer player, IemGameEmbankmentGame game) : base(player)
             {
-                IemUtils.TeleportPlayerPosition(player, game.teamLobby.location);
+                game.teamLobby.addPlayerToLobby(player);
                 me.IemUtils?.SaveInventory(player, game.GetGuid());
                 game.teamLobby.OpenDoors();
             }
@@ -131,6 +158,12 @@ namespace Oxide.Plugins
             public int MainPhaseWait = 60;
             public int SuddenDeathPhaseWait = 15;
             public IncursionHoldingArea.TeamSelectLobby teamLobby;
+
+            public int wallheight = 7;
+            public int startheight = -30; 
+            public int blockshigh = 15;
+            public List<IemObjectPlacement.CopyPastePlacement> partitions
+                    = new List<IemObjectPlacement.CopyPastePlacement>();
 
             public IemGameEmbankmentGame()
             {
@@ -164,8 +197,7 @@ namespace Oxide.Plugins
                 if (!Players.ContainsKey(player.UserIDString))
                     Players[player.UserIDString] = new IemEmbankmentPlayer(player, this);
                 IemUI.ShowTeamUiForPlayer(player, this);
-                IemUtils.TeleportPlayerPosition(player, teamLobby.location);
-
+                //teamLobby.addPlayerToLobby(player);
                 return (IemUtils.IIemTeamPlayer)Players[player.UserIDString];
             }
 
@@ -179,7 +211,7 @@ namespace Oxide.Plugins
                     gsm.ChangeState(EmbankStateManager.GameLobby.Instance);
                 }
                 return true;
-            } 
+            }
 
             public override bool CleanUp()
             {
@@ -188,8 +220,22 @@ namespace Oxide.Plugins
                 IemUtils.DDLog("cleaning up the game");
                 teamLobby?.Destroy();
 
-                foreach (var partition in gsm.partitions)
-                    partition?.Remove();
+                me.Puts("here34r52423");
+
+                if (gsm == null)
+                {
+                    me.Puts("gsm is null");
+                }
+                else
+                {
+
+                }
+
+                    foreach (var partition in partitions)
+                    {
+                        me.Puts("XXXX");
+                        partition?.Remove();
+                    }
 
                 return true;
             }
@@ -414,11 +460,6 @@ namespace Oxide.Plugins
         public class EmbankStateManager : IemStateManager.StateManager
         {
 
-            public List<IemObjectPlacement.CopyPastePlacement> partitions
-                    = new List<IemObjectPlacement.CopyPastePlacement>();
-            int wallheight = 7;
-            int startheight = -30;
-            int blockshigh = 15;
 
             private IemGameEmbankmentGame eg;
 
@@ -459,10 +500,11 @@ namespace Oxide.Plugins
                     EntitiesTakingDamage += gsm.eg.PlayerImmortal;
 
                     me.rust.RunServerCommand("env.time", "12");
-                    for (int i = 0; i <= gsm.blockshigh; i++)
+                    for (int i = 0; i <= gsm.eg.blockshigh; i++)
                     {
-                        gsm.partitions.Add(new IemObjectPlacement.CopyPastePlacement(
-                            "base_partition_wall", new Vector3(-500, gsm.startheight + (gsm.wallheight * i), 10)));
+                        gsm.eg.partitions.Add(new IemObjectPlacement.CopyPastePlacement(
+                            "base_partition_wall", new Vector3(-500, gsm.eg.startheight + 
+                            (gsm.eg.wallheight * i), 10)));
                     }
 
                     // gsm.CreateGameBanner("GAME LOBBY");
@@ -503,6 +545,7 @@ namespace Oxide.Plugins
                             }
 
                             player.EndSleeping();
+                            gsm.eg.teamLobby.removePlayerFromLobby(player);
                             gsm.eg.MovePlayerToTeamLocation(player, iemTeam.Location);
 
                             IemUtils.SetMetabolismValues(player);
@@ -622,7 +665,7 @@ namespace Oxide.Plugins
                 public new void Enter(IemStateManager.StateManager sm)
                 {
                     EmbankStateManager gsm = (EmbankStateManager)sm;
-                    foreach (var partition in gsm.partitions)
+                    foreach (var partition in gsm.eg.partitions)
                         partition?.Remove();
                     foreach (IemGameBase.IemTeam iemTeam in gsm.eg.Teams.Values)
                     {
@@ -807,7 +850,7 @@ namespace Oxide.Plugins
                 {
                     EmbankStateManager gsm = (EmbankStateManager)sm;
                     
-                    foreach (var partition in gsm.partitions)
+                    foreach (var partition in gsm.eg.partitions)
                         partition?.Remove();
 
                     me.Unsubscribe(nameof(OnRunPlayerMetabolism));
@@ -843,7 +886,7 @@ namespace Oxide.Plugins
                         }
                     }
 
-                    foreach (var partition in gsm.partitions)
+                    foreach (var partition in gsm.eg.partitions)
                         partition?.Remove();
 
                     me.Unsubscribe(nameof(OnRunPlayerMetabolism));

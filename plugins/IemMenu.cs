@@ -1,4 +1,5 @@
 ﻿//Requires: IemUtils
+//Requires: IemUI
 //Requires: IemGameBase
 //Requires: Kits
 using UnityEngine;
@@ -7,19 +8,9 @@ using Oxide.Game.Rust.Cui;
 using Oxide.Core.Plugins;
 using System;
 using System.Linq;
-using System.Collections.Generic;
-using System;
-using System.Reflection;
 using System.Data;
-using UnityEngine;
-using Facepunch;
-using Oxide.Core;
-using Oxide.Core.Libraries;
-using Oxide.Core.Plugins;
 
-using System.Linq;
 using Oxide.Core.Libraries.Covalence;
-using Oxide.Game.Rust.Cui;
 using System.Collections;
 
 namespace Oxide.Plugins
@@ -27,7 +18,7 @@ namespace Oxide.Plugins
     [Info("Incursion Menu", "Tolland", "0.1.0")]
     public class IemMenu : RustPlugin
     {
-
+         
         #region header
 
         [PluginReference]
@@ -35,6 +26,9 @@ namespace Oxide.Plugins
 
         [PluginReference]
         IemUtils IemUtils;
+
+        [PluginReference]
+        IemUI IemUI;
 
         [PluginReference]
         Kits Kits;
@@ -58,6 +52,7 @@ namespace Oxide.Plugins
             menus["player_controls"] = new Action<BasePlayer, string[]>(ShowPlayerControls);
             menus["copy_paste"] = new Action<BasePlayer, string[]>(ShowCopyPaste);
             menus["kits"] = new Action<BasePlayer, string[]>(ShowKits);
+            menus["homes"] = new Action<BasePlayer, string[]>(ShowHomes);
             menus["main_menu"] = new Action<BasePlayer, string[]>(ShowMainMenu);
             menus["game_stats"] = new Action<BasePlayer, string[]>(ShowGameStats);
             menus["player_stats"] = new Action<BasePlayer, string[]>(ShowPlayerStats);
@@ -71,10 +66,6 @@ namespace Oxide.Plugins
             {
                 if (!playerkeys.ContainsKey(player.UserIDString))
                     playerkeys[player.UserIDString] = new PlayerMenu(player.UserIDString);
-
-                player.SendConsoleCommand("bind f5 iem.menu toggle");
-                player.SendConsoleCommand("bind f6 iem.menu move");
-
                 CheckPlayer(player);
             }
         }
@@ -83,7 +74,7 @@ namespace Oxide.Plugins
             if (Entity != null)
             {
                 //Interface.Oxide.CallHook("OnRemovedEntity", Entity);
-                if (!Entity.isDestroyed)
+                if (!Entity.IsDestroyed)
                     Entity.Kill(BaseNetworkable.DestroyMode.None);
             }
         }
@@ -92,10 +83,10 @@ namespace Oxide.Plugins
             for (int i = 0; i < entities.Count; i++)
             {
                 DoRemove(entities[i], false);
-                yield return new WaitWhile(new Func<bool>(() => (!entities[i].isDestroyed)));
+                yield return new WaitWhile(new Func<bool>(() => (!entities[i].IsDestroyed)));
             }
         }
-        public Dictionary<string, uint> lastpaste = new Dictionary<string, uint>();
+        public Dictionary<string, HashSet<uint>> lastpaste = new Dictionary<string, HashSet<uint>>();
 
         void OnPlayerSleepEnded(BasePlayer player)
         {
@@ -233,6 +224,15 @@ namespace Oxide.Plugins
         {
             //Puts("calling check player");
             ShowMenuHud(player);
+
+            player.SendConsoleCommand("bind f5 iem.menu toggle");
+            player.SendConsoleCommand("bind f6 iem.menu move");
+
+            player.SendConsoleCommand("bind rightarrow iem.keys rightarrow");
+            player.SendConsoleCommand("bind leftarrow iem.keys leftarrow");
+            player.SendConsoleCommand("bind downarrow iem.keys downarrow");
+            player.SendConsoleCommand("bind uparrow iem.keys uparrow");
+            
         }
 
         void ShowMenuHud(BasePlayer player)
@@ -409,43 +409,6 @@ namespace Oxide.Plugins
 
         }
 
-        public enum ElementType
-        {
-            OutlineText,
-            Panel,
-            Button,
-            Image,
-            Label,
-            TextBox
-        }
-
-
-        public class BaseElement
-        {
-            public ElementType type { get; set; }
-            public string Text { get; set; }
-            public int FontSize { get; set; }
-            public string ImgUrl { get; set; }
-            public string Command { get; set; }
-            public bool Close { get; set; }
-            public float xmin { get; set; }
-            public float xmax { get; set; }
-            public float ymin { get; set; }
-            public float ymax { get; set; }
-            public string color { get; set; }
-            public string backcolor { get; set; }
-            public TextAnchor align { get; set; }
-
-            public BaseElement()
-            {
-                FontSize = 40;
-                Text = "";
-                color = "1 1 1 1";
-                backcolor = "0.1 0.1 0.1 0.6";
-                align = TextAnchor.MiddleLeft;
-            }
-
-        }
 
         #endregion
 
@@ -459,7 +422,7 @@ namespace Oxide.Plugins
         /// <param name="baseElements">a collection of elements to place</param>
         /// <param name="panel_name">track the panel name so it can be managed</param>
         public static void ShowMainContentPanel(BasePlayer player,
-            List<BaseElement> baseElements,
+            List<IemUI.BaseElement> baseElements,
             string panel_name)
         {
             string gui = panel_name + "_right";
@@ -485,7 +448,7 @@ namespace Oxide.Plugins
             foreach (var baseelement in baseElements)
             {
 
-                if (baseelement.type == ElementType.Image)
+                if (baseelement.type == IemUI.ElementType.Image)
                 {
                     elements.Add(new CuiElement
                     {
@@ -504,7 +467,7 @@ namespace Oxide.Plugins
                             }
                     });
                 }
-                else if (baseelement.type == ElementType.Panel)
+                else if (baseelement.type == IemUI.ElementType.Panel)
                 {
                     elements.Add(
                     new CuiPanel
@@ -519,7 +482,7 @@ namespace Oxide.Plugins
                     }, mainName);
 
                 }
-                else if (baseelement.type == ElementType.Label)
+                else if (baseelement.type == IemUI.ElementType.Label)
                 {
                     elements.Add(
                        new CuiElement
@@ -545,7 +508,7 @@ namespace Oxide.Plugins
                             }
                        });
                 }
-                else if (baseelement.type == ElementType.OutlineText)
+                else if (baseelement.type == IemUI.ElementType.OutlineText)
                 {
                     elements.Add(new CuiElement
                     {
@@ -572,7 +535,7 @@ namespace Oxide.Plugins
                     }
                     });
                 }
-                else if (baseelement.type == ElementType.TextBox)
+                else if (baseelement.type == IemUI.ElementType.TextBox)
                 {
                     elements.Add(
                         new CuiPanel
@@ -610,7 +573,7 @@ namespace Oxide.Plugins
                     });
 
                 }
-                else if (baseelement.type == ElementType.Button)
+                else if (baseelement.type == IemUI.ElementType.Button)
                 {
                     elements.Add(new CuiButton
                     {
@@ -697,7 +660,7 @@ namespace Oxide.Plugins
             }
 
             //section for main content of page
-            var elements = new List<BaseElement>() { };
+            var elements = new List<IemUI.BaseElement>() { };
 
             List<string> panels = new List<string>();
 
@@ -737,9 +700,9 @@ namespace Oxide.Plugins
                     maxx,
                     maxy });
 
-                elements.Add(new BaseElement()
+                elements.Add(new IemUI.BaseElement()
                 {
-                    type = ElementType.Panel,
+                    type = IemUI.ElementType.Panel,
                     color = "0.7 0.2 0.1 1",
                     xmin = minx,
                     xmax = maxx,
@@ -776,9 +739,9 @@ namespace Oxide.Plugins
                         continue;
                 }
 
-                elements.Add(new BaseElement()
+                elements.Add(new IemUI.BaseElement()
                 {
-                    type = ElementType.Image,
+                    type = IemUI.ElementType.Image,
                     ImgUrl = gm.Value.TileImgUrl,
                     xmin = panelSlots[slot][0],
                     xmax = panelSlots[slot][2],
@@ -787,9 +750,9 @@ namespace Oxide.Plugins
 
                 });
 
-                elements.Add(new BaseElement()
+                elements.Add(new IemUI.BaseElement()
                 {
-                    type = ElementType.Button,
+                    type = IemUI.ElementType.Button,
                     Text = gm.Value.Name,
                     Command = "iem.menu game_detail " + gm.Key,
                     xmin = panelSlots[slot][0],
@@ -802,9 +765,9 @@ namespace Oxide.Plugins
                 slot++;
             }
 
-            elements.Add(new BaseElement()
+            elements.Add(new IemUI.BaseElement()
             {
-                type = ElementType.OutlineText,
+                type = IemUI.ElementType.OutlineText,
                 Text = $"<color=#ffffff>Main menu</color>",
                 xmin = 0.05f,
                 xmax = 0.75f,
@@ -847,7 +810,7 @@ namespace Oxide.Plugins
             }
 
             //section for main content of page
-            var elements = new List<BaseElement>() { };
+            var elements = new List<IemUI.BaseElement>() { };
 
             List<string> panels = new List<string>();
 
@@ -887,9 +850,9 @@ namespace Oxide.Plugins
                     maxx,
                     maxy });
 
-                elements.Add(new BaseElement()
+                elements.Add(new IemUI.BaseElement()
                 {
-                    type = ElementType.Panel,
+                    type = IemUI.ElementType.Panel,
                     color = "0.7 0.2 0.1 1",
                     xmin = minx,
                     xmax = maxx,
@@ -926,9 +889,9 @@ namespace Oxide.Plugins
                         continue;
                 }
 
-                elements.Add(new BaseElement()
+                elements.Add(new IemUI.BaseElement()
                 {
-                    type = ElementType.Image,
+                    type = IemUI.ElementType.Image,
                     ImgUrl = gm.Value.TileImgUrl,
                     xmin = panelSlots[slot][0],
                     xmax = panelSlots[slot][2],
@@ -937,9 +900,9 @@ namespace Oxide.Plugins
 
                 });
 
-                elements.Add(new BaseElement()
+                elements.Add(new IemUI.BaseElement()
                 {
-                    type = ElementType.Button,
+                    type = IemUI.ElementType.Button,
                     Text = gm.Value.Name,
                     Command = "iem.menu game_detail " + gm.Key,
                     xmin = panelSlots[slot][0],
@@ -952,9 +915,9 @@ namespace Oxide.Plugins
                 slot++;
             }
 
-            elements.Add(new BaseElement()
+            elements.Add(new IemUI.BaseElement()
             {
-                type = ElementType.OutlineText,
+                type = IemUI.ElementType.OutlineText,
                 Text = $"<color=#ffffff>Main menu</color>",
                 xmin = 0.05f,
                 xmax = 0.75f,
@@ -977,6 +940,9 @@ namespace Oxide.Plugins
 
         [PluginReference]
         Plugin CopyPaste;
+
+        [PluginReference]
+        Plugin NTeleportation;
 
         //[PluginReference]
         //Plugin Kits;
@@ -1004,6 +970,15 @@ namespace Oxide.Plugins
                     Command = "iem.menu menu kits",
                 });
             }
+
+            //if (me.NTeleportation != null)
+            //{
+            //    buttons.Add(new BaseButton()
+            //    {
+            //        Text = "Homes",
+            //        Command = "iem.menu menu homes",
+            //    });
+            //}
             if (me.CopyPaste11 == null)
             {
                 me.Puts("Copy paste 11 is null");
@@ -1020,7 +995,7 @@ namespace Oxide.Plugins
             }
 
             //section for main content of page
-            var elements = new List<BaseElement>() { };
+            var elements = new List<IemUI.BaseElement>() { };
 
             List<string> panels = new List<string>();
 
@@ -1060,7 +1035,7 @@ namespace Oxide.Plugins
                     maxx,
                     maxy });
 
-                //elements.Add(new BaseElement()
+                //elements.Add(new IemUI.BaseElement()
                 //{
                 //    type = ElementType.Panel,
                 //    color = "0.7 0.2 0.1 1",
@@ -1076,9 +1051,9 @@ namespace Oxide.Plugins
             }
 
 
-            elements.Add(new BaseElement()
+            elements.Add(new IemUI.BaseElement()
             {
-                type = ElementType.OutlineText,
+                type = IemUI.ElementType.OutlineText,
                 Text = $"<color=#ffffff>Plugin Control</color>",
                 xmin = 0.05f,
                 xmax = 0.75f,
@@ -1087,7 +1062,7 @@ namespace Oxide.Plugins
             });
 
 
-            //elements.Add(new BaseElement()
+            //elements.Add(new IemUI.BaseElement()
             //{
             //    type = ElementType.Button,
             //    Text = "bleh bleh",
@@ -1125,8 +1100,16 @@ namespace Oxide.Plugins
                 });
             }
 
+            buttons.Add(new BaseButton()
+            {
+                Text = "Delete Builidings",
+                Command = "iem.menu delete_buildings " + player.UserIDString,
+                ButtonColor = "128 0 128 1"
+            });
+
+
             //section for main content of page
-            var elements = new List<BaseElement>() { };
+            var elements = new List<IemUI.BaseElement>() { };
 
             List<string> panels = new List<string>();
 
@@ -1163,9 +1146,9 @@ namespace Oxide.Plugins
                     maxx,
                     maxy });
 
-                elements.Add(new BaseElement()
+                elements.Add(new IemUI.BaseElement()
                 {
-                    type = ElementType.Panel,
+                    type = IemUI.ElementType.Panel,
                     color = "0.7 0.2 0.1 1",
                     xmin = minx,
                     xmax = maxx,
@@ -1173,8 +1156,6 @@ namespace Oxide.Plugins
                     ymax = maxy
                 });
 
-                // me.Puts("panelslot min=" + panelSlotsmin);
-                // me.Puts("panelslot max=" + panelSlotsmax);
                 curCol++;
             }
 
@@ -1214,6 +1195,12 @@ namespace Oxide.Plugins
                     { "Name", "Bridge" },
                     { "Filename", "bridgev1" },
                     { "TileImgUrl", "http://90.213.126.3:8080/images/bridgev1.png" }
+                },
+                new Dictionary<string, string>()
+                {
+                    { "Name", "Raid Tower (6st)" },
+                    { "Filename", "raidtower_v1" },
+                    { "TileImgUrl", "http://limepepper.co.uk/images/raidtower_v1.png" }
                 }
                 };
 
@@ -1222,9 +1209,9 @@ namespace Oxide.Plugins
             int slot = 0;
             foreach (Dictionary<string, string> item in mypastes)
             {
-                elements.Add(new BaseElement()
+                elements.Add(new IemUI.BaseElement()
                 {
-                    type = ElementType.Image,
+                    type = IemUI.ElementType.Image,
                     ImgUrl = item["TileImgUrl"],
                     xmin = panelSlots[slot][0],
                     xmax = panelSlots[slot][2],
@@ -1233,9 +1220,9 @@ namespace Oxide.Plugins
 
                 });
 
-                elements.Add(new BaseElement()
+                elements.Add(new IemUI.BaseElement()
                 {
-                    type = ElementType.Button,
+                    type = IemUI.ElementType.Button,
                     Text = item["Name"],
                     Command = "iem.menu preview " + item["Filename"],
                     xmin = panelSlots[slot][0],
@@ -1250,9 +1237,9 @@ namespace Oxide.Plugins
 
 
 
-            elements.Add(new BaseElement()
+            elements.Add(new IemUI.BaseElement()
             {
-                type = ElementType.OutlineText,
+                type = IemUI.ElementType.OutlineText,
                 Text = $"<color=#ffffff>Copy Paste Buildings</color>",
                 xmin = 0.05f,
                 xmax = 0.75f,
@@ -1286,7 +1273,7 @@ namespace Oxide.Plugins
             }
 
             //section for main content of page
-            var elements = new List<BaseElement>() { };
+            var elements = new List<IemUI.BaseElement>() { };
 
             List<string> panels = new List<string>();
 
@@ -1299,9 +1286,6 @@ namespace Oxide.Plugins
 
             int curRow = 0;
             int curCol = 0;
-
-
-            //me.Puts("width=" + width);
 
             List<float[]> panelSlots = new List<float[]>();
 
@@ -1326,25 +1310,13 @@ namespace Oxide.Plugins
                     maxx,
                     maxy });
 
-                //elements.Add(new BaseElement()
-                //{
-                //    type = ElementType.Panel,
-                //    color = "0.7 0.2 0.1 1",
-                //    xmin = minx,
-                //    xmax = maxx,
-                //    ymin = miny,
-                //    ymax = maxy
-                //});
-
-                //  me.Puts("panelslot min=" + panelSlotsmin);
-                // me.Puts("panelslot max=" + panelSlotsmax);
                 curCol++;
             }
 
 
-            elements.Add(new BaseElement()
+            elements.Add(new IemUI.BaseElement()
             {
-                type = ElementType.OutlineText,
+                type = IemUI.ElementType.OutlineText,
                 Text = $"<color=#ffffff>Kits menu</color>",
                 xmin = 0.05f,
                 xmax = 0.75f,
@@ -1354,6 +1326,7 @@ namespace Oxide.Plugins
 
             var kits = me.Kits.GetAllKits();
             int count = 0;
+            var incr = 0.03;
             foreach (var item in kits)
             {
                 // me.Puts("kit " + " " + item);
@@ -1365,44 +1338,44 @@ namespace Oxide.Plugins
                 var seekit = me.Kits.CallHook("CanSeeKit", player, item, false, buff);
                 me.Puts("can see kit " + " " + seekit);
                 me.Puts("can see kit " + " " + buff);
-                if ((bool)seekit)
+                if ((bool)seekit || player.IsAdmin())
                 {
-                    elements.Add(new BaseElement()
+                    elements.Add(new IemUI.BaseElement()
                     {
-                        type = ElementType.TextBox,
+                        type = IemUI.ElementType.TextBox,
                         Text = $"<color=#ffffff>" + item + "</color>" + buff,
-                        FontSize = 22,
+                        FontSize = 18,
                         xmin = 0.05f,
                         xmax = 0.75f,
-                        ymin = 0.61f - (float)(count * 0.05),
-                        ymax = 0.65f - (float)(count * 0.05)
+                        ymin = 0.71f - (float)(count * incr),
+                        ymax = 0.75f - (float)(count * incr)
                     });
                     if (canredeem is bool && (bool)canredeem)
                     {
-                        elements.Add(new BaseElement()
+                        elements.Add(new IemUI.BaseElement()
                         {
-                            type = ElementType.Button,
+                            type = IemUI.ElementType.Button,
                             Text = "Redeem",
                             Command = "iem.menu redeem_kit " + item,
                             xmin = 0.25f,
                             xmax = 0.35f,
-                            ymin = 0.61f - (float)(count * 0.05),
-                            ymax = 0.65f - (float)(count * 0.05),
+                            ymin = 0.71f - (float)(count * incr),
+                            ymax = 0.75f - (float)(count * incr),
                             align = TextAnchor.MiddleCenter,
                             backcolor = "1 0 0 1"
                         });
                     }
                     else
                     {
-                        elements.Add(new BaseElement()
+                        elements.Add(new IemUI.BaseElement()
                         {
-                            type = ElementType.TextBox,
+                            type = IemUI.ElementType.TextBox,
                             Text = $"<color=#ffffff>" + canredeem + "</color>",
-                            FontSize = 22,
+                            FontSize = 18,
                             xmin = 0.25f,
                             xmax = 0.65f,
-                            ymin = 0.61f - (float)(count * 0.05),
-                            ymax = 0.65f - (float)(count * 0.05),
+                            ymin = 0.71f - (float)(count * incr),
+                            ymax = 0.75f - (float)(count * incr),
                         });
 
                     }
@@ -1411,21 +1384,162 @@ namespace Oxide.Plugins
             }
 
             count++;
-            elements.Add(new BaseElement()
+            elements.Add(new IemUI.BaseElement()
             {
-                type = ElementType.Button,
+                type = IemUI.ElementType.Button,
                 Text = "Clear inventory",
                 Command = "iem.menu inventory_strip",
                 xmin = 0.05f,
                 xmax = 0.75f,
-                ymin = 0.61f - (float)(count * 0.05),
-                ymax = 0.65f - (float)(count * 0.05),
+                ymin = 0.71f - (float)(count * incr),
+                ymax = 0.75f - (float)(count * incr),
                 align = TextAnchor.MiddleCenter,
                 backcolor = "0 1 0 1"
             });
 
             ShowLeftButtonPanel(player, buttons, "kits");
             ShowMainContentPanel(player, elements, "kits");
+        }
+
+        #endregion
+
+
+        #region ShowHomes
+
+
+        public static void ShowHomes(BasePlayer player, string[] args)
+        {
+            //me.Puts("showing kits");
+
+            var buttons = new List<BaseButton>() { };
+
+            //section for main content of page
+            var elements = new List<IemUI.BaseElement>() { };
+
+            List<string> panels = new List<string>();
+
+            float rows = 2;
+            float cols = 5;
+            float gap = 0.018f;
+            float width = (1 - ((cols + 1) * gap)) / cols;
+            float height = 0.2f;
+            float starty = 0.7f;
+
+            int curRow = 0;
+            int curCol = 0;
+
+            List<float[]> panelSlots = new List<float[]>();
+
+            for (int x = 0; x < 10; x += 1)
+            {
+                if (curCol >= cols)
+                {
+                    curCol = 0;
+                    curRow++;
+                }
+
+                float minx = (curCol * width) + ((curCol + 1) * gap);
+                float miny = starty - ((curRow + 1) * gap) - (height * curRow) - height;
+                float maxx = minx + width;
+                float maxy = starty - ((curRow + 1) * gap) - (height * curRow);
+
+                string panelSlotsmin = "" + minx + " " + miny;
+                string panelSlotsmax = "" + maxx + " " + maxy;
+
+                panelSlots.Add(new float[] {minx,
+                    miny,
+                    maxx,
+                    maxy });
+
+                curCol++;
+            }
+
+
+            elements.Add(new IemUI.BaseElement()
+            {
+                type = IemUI.ElementType.OutlineText,
+                Text = $"<color=#ffffff>Homes menu</color>",
+                xmin = 0.05f,
+                xmax = 0.75f,
+                ymin = 0.75f,
+                ymax = 0.95f
+            });
+
+            var kits = me.Kits.GetAllKits();
+            int count = 0;
+            var incr = 0.03;
+            foreach (var item in kits)
+            {
+                // me.Puts("kit " + " " + item);
+                //me.Kits.CanRedeemKit(player, "admin");
+                var canredeem = me.Kits.CallHook("CanRedeemKit", player, item);
+                me.Puts("can redeem kit " + item + " " + canredeem);
+
+                string buff = "";
+                var seekit = me.Kits.CallHook("CanSeeKit", player, item, false, buff);
+                me.Puts("can see kit " + " " + seekit);
+                me.Puts("can see kit " + " " + buff);
+                if ((bool)seekit || player.IsAdmin())
+                {
+                    elements.Add(new IemUI.BaseElement()
+                    {
+                        type = IemUI.ElementType.TextBox,
+                        Text = $"<color=#ffffff>" + item + "</color>" + buff,
+                        FontSize = 18,
+                        xmin = 0.05f,
+                        xmax = 0.75f,
+                        ymin = 0.71f - (float)(count * incr),
+                        ymax = 0.75f - (float)(count * incr)
+                    });
+                    if (canredeem is bool && (bool)canredeem)
+                    {
+                        elements.Add(new IemUI.BaseElement()
+                        {
+                            type = IemUI.ElementType.Button,
+                            Text = "Redeem",
+                            Command = "iem.menu redeem_kit " + item,
+                            xmin = 0.25f,
+                            xmax = 0.35f,
+                            ymin = 0.71f - (float)(count * incr),
+                            ymax = 0.75f - (float)(count * incr),
+                            align = TextAnchor.MiddleCenter,
+                            backcolor = "1 0 0 1"
+                        });
+                    }
+                    else
+                    {
+                        elements.Add(new IemUI.BaseElement()
+                        {
+                            type = IemUI.ElementType.TextBox,
+                            Text = $"<color=#ffffff>" + canredeem + "</color>",
+                            FontSize = 18,
+                            xmin = 0.25f,
+                            xmax = 0.65f,
+                            ymin = 0.71f - (float)(count * incr),
+                            ymax = 0.75f - (float)(count * incr),
+                        });
+
+                    }
+                    count++;
+                }
+            }
+
+            count++;
+            elements.Add(new IemUI.BaseElement()
+            {
+                type = IemUI.ElementType.Button,
+                Text = "Clear inventory",
+                Command = "iem.menu inventory_strip",
+                xmin = 0.05f,
+                xmax = 0.75f,
+                ymin = 0.71f - (float)(count * incr),
+                ymax = 0.75f - (float)(count * incr),
+                align = TextAnchor.MiddleCenter,
+                backcolor = "0 1 0 1"
+            });
+
+            ShowLeftButtonPanel(player, buttons, "homes");
+            ShowMainContentPanel(player, elements, "homes");
         }
 
         #endregion
@@ -1513,11 +1627,11 @@ namespace Oxide.Plugins
             }
 
 
-            var elements = new List<BaseElement>() { };
+            var elements = new List<IemUI.BaseElement>() { };
 
-            elements.Add(new BaseElement()
+            elements.Add(new IemUI.BaseElement()
             {
-                type = ElementType.OutlineText,
+                type = IemUI.ElementType.OutlineText,
                 Text = $"<color=#ffffff>{gm.Name}</color>",
                 xmin = 0.1f,
                 xmax = 0.75f,
@@ -1526,20 +1640,28 @@ namespace Oxide.Plugins
 
             });
 
-            elements.Add(new BaseElement()
+            if (gm.HasActiveDetailScreen)
             {
-                type = ElementType.Label,
-                Text = gm.Description,
-                xmin = 0.1f,
-                xmax = 0.75f,
-                ymin = 0.15f,
-                ymax = 0.75f
+                elements = elements.Concat(gm.GetActiveDetailScreen()).ToList();
 
-            });
-
-            elements.Add(new BaseElement()
+            }
+            else
             {
-                type = ElementType.Image,
+                elements.Add(new IemUI.BaseElement()
+                {
+                    type = IemUI.ElementType.Label,
+                    Text = gm.Description,
+                    xmin = 0.1f,
+                    xmax = 0.75f,
+                    ymin = 0.15f,
+                    ymax = 0.75f
+
+                });
+            }
+
+            elements.Add(new IemUI.BaseElement()
+            {
+                type = IemUI.ElementType.Image,
                 ImgUrl = gm.TileImgUrl,
                 xmin = 0.65f,
                 xmax = 0.88f,
@@ -1596,11 +1718,11 @@ namespace Oxide.Plugins
                 });
             }
 
-            var elements = new List<BaseElement>() { };
+            var elements = new List<IemUI.BaseElement>() { };
 
-            elements.Add(new BaseElement()
+            elements.Add(new IemUI.BaseElement()
             {
-                type = ElementType.OutlineText,
+                type = IemUI.ElementType.OutlineText,
                 Text = $"Player Stats: <color=#ffffff>{gm.Name}</color>",
                 xmin = 0.05f,
                 xmax = 0.75f,
@@ -1608,9 +1730,9 @@ namespace Oxide.Plugins
                 ymax = 0.95f
             });
 
-            elements.Add(new BaseElement()
+            elements.Add(new IemUI.BaseElement()
             {
-                type = ElementType.TextBox,
+                type = IemUI.ElementType.TextBox,
                 Text = $"Loading Image",
                 color = "0 0 0 1",
                 backcolor = "25 25 25 1",
@@ -1624,9 +1746,9 @@ namespace Oxide.Plugins
             //string chart_url = "https://docs.google.com/spreadsheets/d/19U5ZWP-sLZdyGI9UVfeaMa5eXl79CMg8Trdv5nGyZcc/pubchart?oid=1877531591&format=image";
             string chart_url = "http://90.213.126.3:8080/test2.php?playername=" +
                 Uri.EscapeDataString(player.displayName) + "&steamid=" + player.UserIDString + "&difficulty=" + level;
-            elements.Add(new BaseElement()
+            elements.Add(new IemUI.BaseElement()
             {
-                type = ElementType.Image,
+                type = IemUI.ElementType.Image,
                 Text = level + " Level",
                 ImgUrl = chart_url,
                 xmin = 0.05f,
@@ -1678,11 +1800,11 @@ namespace Oxide.Plugins
                 });
             }
 
-            var elements = new List<BaseElement>() { };
+            var elements = new List<IemUI.BaseElement>() { };
 
-            elements.Add(new BaseElement()
+            elements.Add(new IemUI.BaseElement()
             {
-                type = ElementType.OutlineText,
+                type = IemUI.ElementType.OutlineText,
                 Text = $"Game Stats: <color=#ffffff>{gm.Name}</color>",
                 xmin = 0.05f,
                 xmax = 0.75f,
@@ -1691,9 +1813,9 @@ namespace Oxide.Plugins
 
             });
 
-            elements.Add(new BaseElement()
+            elements.Add(new IemUI.BaseElement()
             {
-                type = ElementType.TextBox,
+                type = IemUI.ElementType.TextBox,
                 Text = $"Loading Image",
                 color = "0 0 0 1",
                 backcolor = "25 25 25 1",
@@ -1708,9 +1830,9 @@ namespace Oxide.Plugins
             string chart_url = "http://90.213.126.3:8080/test5.php?playername=" +
                 Uri.EscapeDataString(player.displayName) + "&steamid=" + player.UserIDString + "&difficulty=" + level;
 
-            elements.Add(new BaseElement()
+            elements.Add(new IemUI.BaseElement()
             {
-                type = ElementType.Image,
+                type = IemUI.ElementType.Image,
                 Text = level + " Level",
                 ImgUrl = chart_url,
                 xmin = 0.05f,
@@ -1757,11 +1879,11 @@ namespace Oxide.Plugins
                 Command = "iem.menu restart_level " + game.Name
             });
 
-            var elements = new List<BaseElement>() { };
+            var elements = new List<IemUI.BaseElement>() { };
 
-            elements.Add(new BaseElement()
+            elements.Add(new IemUI.BaseElement()
             {
-                type = ElementType.OutlineText,
+                type = IemUI.ElementType.OutlineText,
                 Text = $"You are currently playing <color=red>{game.Name}</color>",
                 xmin = 0.05f,
                 xmax = 0.75f,
@@ -1773,9 +1895,9 @@ namespace Oxide.Plugins
             string message = $"Difficulty is {game.difficultyLevel} \nStarted at XX:XX\n Level is {game.level} \n\n You can quit this " +
                 "game and return to the map with the button on the left";
 
-            elements.Add(new BaseElement()
+            elements.Add(new IemUI.BaseElement()
             {
-                type = ElementType.Label,
+                type = IemUI.ElementType.Label,
                 Text = message,
                 xmin = 0.1f,
                 xmax = 0.75f,
@@ -1844,10 +1966,6 @@ namespace Oxide.Plugins
                 }
             }
 
-            //if (!playerkeys[player.UserIDString].menus.ContainsKey(menuname))
-            //{
-            //    playerkeys[player.UserIDString].menus[menuname] = false;
-            //}
         }
 
         #endregion
@@ -1917,7 +2035,8 @@ namespace Oxide.Plugins
                 HideMenu(player, item);
             }
         }
-        int rayLayer = LayerMask.GetMask(new string[] { "Construction", "Deployed", "Tree", "Terrain", "Resource", "World", "Water", "Default", "Prevent Building" });
+        int rayLayer = LayerMask.GetMask(new string[] { "Construction", "Deployed", "Tree",
+            "Terrain", "Resource", "World", "Water", "Default", "Prevent Building" });
         bool FindRayEntity(Vector3 sourcePos, Vector3 sourceDir, out Vector3 point, out BaseEntity entity)
         {
             RaycastHit hitinfo;
@@ -1929,6 +2048,45 @@ namespace Oxide.Plugins
             point = hitinfo.point;
             entity = hitinfo.GetEntity();
             return true;
+        }
+
+        [ConsoleCommand("iem.keys")]
+        void ccmdEventKeys(ConsoleSystem.Arg arg)
+        {
+            Puts("");
+            for (int i = 0; i < arg.Args.GetLength(0); i++)
+            {
+                Puts($"command pos {i} is {arg.Args[i]}");
+            }
+            var player = arg.Player();
+
+
+            switch (arg.Args[0].ToLower())
+            {
+                case "asterisk":
+                    SendReply(player, "asterisk pressend");
+                    me.Puts("efhweiufhuie");
+
+                    break;
+                case "rightarrow":
+                    //weird problem that a single arg is appended with value True
+                    if (arg.Args.Length > 0 && arg.Args[1] != "True")
+                    {
+                             me.Puts("right awwoe menu " + arg.Args[1]);
+                      
+                    }
+
+                    break;
+                case "leftarrow":
+                    //weird problem that a single arg is appended with value True
+                    if (arg.Args.Length > 0 && arg.Args[1] != "True")
+                    {
+                             me.Puts("rotating left " + arg.Args[1]);
+                       
+                    }
+
+                    break;
+            }
         }
 
         [ConsoleCommand("iem.menu")]
@@ -2060,7 +2218,7 @@ namespace Oxide.Plugins
 
                         string buff = "";
                         bool seekit = (bool)me.Kits.CallHook("CanSeeKit", player, arg.Args[1], false, buff);
-                        if (seekit && redeemkit)
+                        if (redeemkit)
                         {
                             me.Kits?.Call("GiveKit", player, arg.Args[1]);
                         }
@@ -2103,7 +2261,8 @@ namespace Oxide.Plugins
                             //  Puts("is preload data");
                             foreach (var data in (List<Dictionary<string, object>>)success1)
                             {
-                                Vector3 point1, point2, point3, point4, point5, point6, point7, point8;
+                                Vector3 point1, point2, point3, point4, point5, point6, point7, point8
+                                    , point9, point10, point11, point12;
                                 try
                                 {
                                     var prefabname = (string)data["prefabname"];
@@ -2111,8 +2270,228 @@ namespace Oxide.Plugins
                                     var pos = (Vector3)data["position"];
                                     var rot = (Quaternion)data["rotation"];
 
-                                    // Puts("prefab is " + prefabname);
-                                    if (((string)data["prefabname"]).Contains("/foundation.triangle/"))
+                                    //assets/prefabs/building/door.double.hinged/door.double.hinged.metal.prefab
+
+                                    ///building/door.hinged/door.hinged.metal.prefab
+
+                                    if (((string)data["prefabname"]).Contains("/door.hinged/"))
+                                    {
+                                        point1 = new Vector3(pos.x, pos.y, pos.z + 1.45f) - pos;
+                                        point2 = new Vector3(pos.x, pos.y + 2.95f, pos.z + 1.45f) - pos;
+                                        point3 = new Vector3(pos.x, pos.y + 2.95f, pos.z - 1.45f) - pos;
+                                        point4 = new Vector3(pos.x, pos.y, pos.z - 1.45f) - pos;
+
+                                        point5 = new Vector3(pos.x, pos.y, pos.z + 0.7f) - pos;
+                                        point6 = new Vector3(pos.x, pos.y + 2.3f, pos.z + 0.7f) - pos;
+                                        point7 = new Vector3(pos.x, pos.y + 2.3f, pos.z - 0.7f) - pos;
+                                        point8 = new Vector3(pos.x, pos.y, pos.z - 0.7f) - pos;
+
+
+                                        point1 = (rot * point1) + pos;
+                                        point2 = (rot * point2) + pos;
+                                        point3 = (rot * point3) + pos;
+                                        point4 = (rot * point4) + pos;
+                                        point5 = (rot * point5) + pos;
+                                        point6 = (rot * point6) + pos;
+                                        point7 = (rot * point7) + pos;
+                                        point8 = (rot * point8) + pos;
+
+                                        IemUtils.DrawSingleDoorOutline(player,
+                                              point1,
+                                              point2,
+                                              point3,
+                                              point4,
+                                              point5,
+                                              point6,
+                                              point7,
+                                              point8,
+                                              10f
+                                         );
+
+                                        timers.Add(timer.Repeat(1f, 100, () =>
+                                        {
+                                            IemUtils.DrawSingleDoorOutline(player,
+                                            point1,
+                                            point2,
+                                            point3,
+                                            point4,
+                                            point5,
+                                            point6,
+                                            point7,
+                                            point8,
+                                            1f
+                                       );
+                                        }));
+
+                                    }
+                                    else if (((string)data["prefabname"]).Contains("/door.double.hinged/"))
+                                    {
+                                        point1 = new Vector3(pos.x, pos.y, pos.z + 1.45f) - pos;
+                                        point2 = new Vector3(pos.x, pos.y + 2.95f, pos.z + 1.45f) - pos;
+                                        point3 = new Vector3(pos.x, pos.y + 2.95f, pos.z - 1.45f) - pos;
+                                        point4 = new Vector3(pos.x, pos.y, pos.z - 1.45f) - pos;
+
+                                        point5 = pos - pos;
+                                        point6 = new Vector3(pos.x, pos.y + 3f, pos.z) - pos;
+
+
+                                        point1 = (rot * point1) + pos;
+                                        point2 = (rot * point2) + pos;
+                                        point3 = (rot * point3) + pos;
+                                        point4 = (rot * point4) + pos;
+                                        point5 = (rot * point5) + pos;
+                                        point6 = (rot * point6) + pos;
+
+                                        IemUtils.DrawDoubleDoorOutline(player,
+                                              point1,
+                                              point2,
+                                              point3,
+                                              point4,
+                                              point5,
+                                              point6,
+                                              10f
+                                         );
+
+                                        timers.Add(timer.Repeat(1f, 100, () =>
+                                        {
+                                            IemUtils.DrawDoubleDoorOutline(player,
+                                            point1,
+                                            point2,
+                                            point3,
+                                            point4,
+                                              point5,
+                                              point6,
+                                            1f
+                                       );
+                                        }));
+
+                                    }
+                                    //building core/wall/wall.prefab
+                                    //wall.window/wall.window.prefab
+                                    //bool b = listOfStrings.Any(s=>myString.Contains(s));
+
+
+                                    else if ((new List<string>() {
+                                        "/wall/",
+                                        "/wall.window/",
+                                        "/wall.frame/"
+                                    }).Any(s => ((string)data["prefabname"]).Contains(s)))
+                                    {
+                                        point1 = new Vector3(pos.x, pos.y, pos.z + 1.45f) - pos;
+                                        point2 = new Vector3(pos.x, pos.y + 2.95f, pos.z + 1.45f) - pos;
+                                        point3 = new Vector3(pos.x, pos.y + 2.95f, pos.z - 1.45f) - pos;
+                                        point4 = new Vector3(pos.x, pos.y, pos.z - 1.45f) - pos;
+
+                                        point5 = pos - pos;
+                                        point6 = new Vector3(pos.x, pos.y + 3f, pos.z) - pos;
+
+
+                                        point1 = (rot * point1) + pos;
+                                        point2 = (rot * point2) + pos;
+                                        point3 = (rot * point3) + pos;
+                                        point4 = (rot * point4) + pos;
+
+                                        IemUtils.DrawWallOutline(player,
+                                              point1,
+                                              point2,
+                                              point3,
+                                              point4,
+                                              10f
+                                         );
+
+                                        timers.Add(timer.Repeat(1f, 100, () =>
+                                        {
+                                            IemUtils.DrawWallOutline(player,
+                                            point1,
+                                            point2,
+                                            point3,
+                                            point4,
+                                            1f
+                                       );
+                                        }));
+
+                                    }
+                                    else if ((new List<string>() {
+                                        "/wall.low/"
+                                    }).Any(s => ((string)data["prefabname"]).Contains(s)))
+                                    {
+                                        point1 = new Vector3(pos.x, pos.y, pos.z + 1.45f) - pos;
+                                        point2 = new Vector3(pos.x, pos.y + 1f, pos.z + 1.45f) - pos;
+                                        point3 = new Vector3(pos.x, pos.y + 1f, pos.z - 1.45f) - pos;
+                                        point4 = new Vector3(pos.x, pos.y, pos.z - 1.45f) - pos;
+
+                                        point5 = pos - pos;
+                                        point6 = new Vector3(pos.x, pos.y + 3f, pos.z) - pos;
+
+
+                                        point1 = (rot * point1) + pos;
+                                        point2 = (rot * point2) + pos;
+                                        point3 = (rot * point3) + pos;
+                                        point4 = (rot * point4) + pos;
+
+                                        IemUtils.DrawWallOutline(player,
+                                              point1,
+                                              point2,
+                                              point3,
+                                              point4,
+                                              10f
+                                         );
+
+                                        timers.Add(timer.Repeat(1f, 100, () =>
+                                        {
+                                            IemUtils.DrawWallOutline(player,
+                                            point1,
+                                            point2,
+                                            point3,
+                                            point4,
+                                            1f
+                                       );
+                                        }));
+
+                                    }
+                                    ///Building/wall.external.high.wood/wall.external.high.wood.prefab
+
+
+                                    else if (((string)data["prefabname"]).Contains("/wall.external.high.wood/"))
+                                    {
+                                        point1 = new Vector3(pos.x + 2.5f,
+                                            IemUtils.GetGroundY(pos).y,
+                                            pos.z) - pos;
+                                        point2 = new Vector3(pos.x + 2.5f, pos.y + 5f, pos.z) - pos;
+                                        point3 = new Vector3(pos.x - 2.5f, pos.y + 5f, pos.z) - pos;
+                                        point4 = new Vector3(pos.x - 2.5f,
+                                            IemUtils.GetGroundY(pos).y,
+                                            pos.z) - pos;
+
+                                        point5 = pos - pos;
+                                        point6 = new Vector3(pos.x, pos.y + 3f, pos.z) - pos;
+
+                                        point1 = (rot * point1) + pos;
+                                        point2 = (rot * point2) + pos;
+                                        point3 = (rot * point3) + pos;
+                                        point4 = (rot * point4) + pos;
+
+                                        IemUtils.DrawWallOutline(player,
+                                              point1,
+                                              point2,
+                                              point3,
+                                              point4,
+                                              10f
+                                         );
+
+                                        timers.Add(timer.Repeat(1f, 100, () =>
+                                        {
+                                            IemUtils.DrawWallOutline(player,
+                                            point1,
+                                            point2,
+                                            point3,
+                                            point4,
+                                            1f
+                                       );
+                                        }));
+
+                                    }
+                                    else if (((string)data["prefabname"]).Contains("/foundation.triangle/"))
                                     {
                                         // Puts("triangle foundation at " + pos);
                                         var x = (float)Math.Pow((Math.Pow(3.0, 2) - Math.Pow(1.5, 2.0)), (1.0 / 2.0));
@@ -2139,7 +2518,7 @@ namespace Oxide.Plugins
                                               point7,
                                               10f
                                          );
-                                        timers.Add(timer.Every(1f, () =>
+                                        timers.Add(timer.Repeat(1f, 100, () =>
                                         {
                                             IemUtils.DrawTriangleFoundation(player,
                                               point1,
@@ -2191,7 +2570,8 @@ namespace Oxide.Plugins
                                               10f
                                          );
 
-                                        timers.Add(timer.Every(1f, ()=> {
+                                        timers.Add(timer.Repeat(1f, 100, () =>
+                                        {
                                             IemUtils.DrawFoundation(player,
                                             point1,
                                             point2,
@@ -2203,7 +2583,12 @@ namespace Oxide.Plugins
                                             point8,
                                             1f
                                        );
-                                        } ));
+                                        }));
+                                    }
+                                    else
+                                    {
+
+                                        Puts("prefab not handled is " + prefabname);
                                     }
 
 
@@ -2224,7 +2609,7 @@ namespace Oxide.Plugins
                                 SendReply(player, "Couldn't ray something valid in front of you.");
                             }
 
-                            IemUI.ConfirmCancel(player, "Place building", "Confirm?", "Cancel?",
+                            IemUI.ConfirmCancelYN(player, "Place building", "Confirm?", "Cancel?",
                                  () =>
                                  {
                                      foreach (var item in timers)
@@ -2234,12 +2619,13 @@ namespace Oxide.Plugins
 
 
                                      var params111 = new List<string> {
-                           "autoheight", "true",
-                           "height", "0.5",
-                           "blockcollision", "0",
-                           "deployables", "true",
-                           "inventories", "true" };
+                                           "autoheight", "true",
+                                           "height", "0.5",
+                                           "blockcollision", "0",
+                                           "deployables", "true",
+                                           "inventories", "true" };
 
+                                     lastpaste[player.UserIDString] = new HashSet<uint>();
 
                                      var success = CopyPaste?.CallHook("TryPaste", sourcePoint, arg.Args[1], player,
                                         ViewAngles.ToEulerAngles().y, params111.ToArray());
@@ -2252,8 +2638,30 @@ namespace Oxide.Plugins
                                      else
                                      {
                                          SendReply(player, "pasted " + success);
+                                         if (success is List<BaseEntity>)
+                                         {
+                                            // SendReply(player, "is list");
+
+                                             // HashSet<uint> bids = new HashSet<uint>();
+
+                                             foreach (var item in (List<BaseEntity>)success)
+                                             {
+                                                 var bb = (item.GetComponentInParent<BuildingBlock>());
+                                                 if (bb != null)
+                                                 {
+                                                     //bids.Add(bb.buildingID);
+                                                     lastpaste[player.UserIDString].Add(bb.buildingID);
+                                                     //  SendReply(player, "add was " + bb);
+                                                 }
+                                                 else
+                                                 {
+                                                     //SendReply(player, "bb was nyull");
+                                                 }
+                                             }
+                                         }
                                      }
-                                 }, () => {
+                                 }, () =>
+                                 {
                                      foreach (var item in timers)
                                      {
                                          item.Destroy();
@@ -2307,16 +2715,8 @@ namespace Oxide.Plugins
                             if (success is List<BaseEntity>)
                             {
                                 SendReply(player, "is list");
-                                var buildingblock = ((List<BaseEntity>)success)[0].GetComponentInParent<BuildingBlock>();
 
                                 HashSet<uint> bids = new HashSet<uint>();
-
-                                if (buildingblock != null)
-                                {
-                                    //if (!lastpaste.ContainsKey(player.UserIDString)){
-                                    lastpaste[player.UserIDString] = buildingblock.buildingID;
-                                    //}
-                                }
 
                                 foreach (var item in (List<BaseEntity>)success)
                                 {
@@ -2343,17 +2743,41 @@ namespace Oxide.Plugins
 
                     }
                     break;
+                case "delete_buildings":
+                    SendReply(player, "founf player " + player.UserIDString);
+
+                    // var foundLis1t = UnityEngine.GameObject.FindObjectsOfType<BuildingBlock>();
+                    //.Where(                        x => x.OwnerID == player.userID).ToList();
+                    var rghrgr = IemUtils.FindComponentNearestToLocation<BuildingBlock>(player.transform.position, 10);
+
+                    if (rghrgr != null)
+                    {
+                        me.Puts("founf building " + rghrgr.buildingID);
+                        me.Puts("founf building " + rghrgr.OwnerID);
+                    }
+                    else
+                    {
+                        me.Puts("was nll");
+                    }
+                    //}
+
+
+
+                    break;
                 case "move":
                     if (lastpaste.ContainsKey(player.UserIDString))
                     {
-                        //lastpaste[player.UserIDString] = buildingblock.buildingID;
+                        List<BuildingBlock> removeList1 = new List<BuildingBlock>();
 
-                        SendReply(player, "removing building id " + lastpaste[player.UserIDString]);
+                        foreach (var item in lastpaste[player.UserIDString])
+                        {
+                            SendReply(player, "removing building id " + item);
+                            var foundList = UnityEngine.GameObject.FindObjectsOfType<BuildingBlock>().Where(
+                                x => x.buildingID == item).ToList();
+                            removeList1 = removeList1.Concat(foundList).ToList();
+                        }
 
-                        var removeList = UnityEngine.GameObject.FindObjectsOfType<BuildingBlock>().Where(
-                            x => x.buildingID == lastpaste[player.UserIDString]).ToList();
-
-                        ServerMgr.Instance.StartCoroutine(DelayRemove(removeList));
+                        ServerMgr.Instance.StartCoroutine(DelayRemove(removeList1));
 
                     }
                     else

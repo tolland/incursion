@@ -104,26 +104,36 @@ namespace Oxide.Plugins
             }
         }
 
-
+        public class LobbyPlayer
+        {
+            public Vector3 previousLocation;
+            public string userid;
+            public ulong ID;
+            public LobbyPlayer(BasePlayer player)
+            {
+                previousLocation = player.transform.position;
+                userid = player.UserIDString;
+                ID = player.userID;
+            }
+        }
 
 
         public class TeamSelectLobby : HoldingArea
         {
             public IemObjectPlacement.CopyPastePlacement partition;
-            IemGameBase.IemTeamGame teamGame;   
+            IemGameBase.IemTeamGame teamGame;
 
             List<string> zonelist = new List<string>();
             List<BaseEntity> spheres = new List<BaseEntity>();
 
+            public Dictionary<string, LobbyPlayer> lobbyPlayers = new Dictionary<string, LobbyPlayer>();
+
             public TeamSelectLobby(string copypastefile, IemGameBase.IemTeamGame newTeamGame)
             {
-                teamGame = newTeamGame; 
-                
+                teamGame = newTeamGame;
+
                 location = me.IemUtils.NextFreeLocation();
 
-                me.Puts("yield new vector " + location);
-
-                //location = new Vector3(x, y, z);
                 Vector3 centre_location = new Vector3(location.x - 7, location.y, location.z - 2);
 
 
@@ -134,8 +144,6 @@ namespace Oxide.Plugins
                 int i = 0;
                 foreach (var team in teamGame.Teams)
                 {
-                    //  me.Puts("centre loc is " + centre_location);
-                    // me.Puts("loc is " + locs[i]);
                     spheres.Add(IemUtils.CreateZone("team_" + team.Value.GetGuid(),
                         locs[i] + centre_location, 6));
 
@@ -146,6 +154,28 @@ namespace Oxide.Plugins
                 }
                 PlayerEnteredZone += PlayerEnteredTeamZone;
 
+            }
+
+            public void addPlayerToLobby(BasePlayer player)
+            {
+                if (!lobbyPlayers.ContainsKey(player.UserIDString)){
+                    lobbyPlayers[player.UserIDString] = new LobbyPlayer(player);
+                    IemUtils.TeleportPlayerPosition(player, location);
+                }
+            }
+
+            public void removePlayerFromLobby(BasePlayer player, bool teleport=false)
+            {
+                if (lobbyPlayers.ContainsKey(player.UserIDString))
+                {
+                    var lp = lobbyPlayers[player.UserIDString];
+                    if (teleport)
+                    {
+                        IemUtils.TeleportPlayerPosition(player,
+                            lp.previousLocation);
+                    }
+                    lobbyPlayers.Remove(player.UserIDString);
+                }
             }
 
             public void OpenDoors()
@@ -230,8 +260,16 @@ namespace Oxide.Plugins
             public void Destroy()
             {
                 partition?.Remove();
+
+                foreach (var player in lobbyPlayers.Values)
+                {
+                    removePlayerFromLobby(BasePlayer.FindByID(player.ID), true);
+                }
+
+                //TODO fix this
                 foreach (BasePlayer player in BasePlayer.activePlayerList)
                     IemUI.RemoveTeamUiForPlayer(player, teamGame);
+
                 foreach (var zone in zonelist)
                 {
                     me.Puts("erasing zone " + zone);
@@ -245,12 +283,13 @@ namespace Oxide.Plugins
 
                     if (sphere.prefabID == prefabID)
                     {
-                         me.Puts("found entity with prefabID "
-                                  + sphere.prefabID.ToString());
+                        me.Puts("found entity with prefabID "
+                                 + sphere.prefabID.ToString());
 
                         sphere.KillMessage();
                         //entity.Kill (); 
-                    }else
+                    }
+                    else
                     {
                         me.Puts("found entity with other prefabID "
                                  + sphere.prefabID.ToString());

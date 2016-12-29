@@ -878,6 +878,9 @@ namespace Oxide.Plugins
                                 unassignid = false;
                             }
                             buildingblock.buildingID = buildingid;
+                        }else
+                        {
+                            //Puts("unable to set buildingid for " + entity.LookupPrefab().name);
                         }
                         entity.skinID = skinid;
                         entity.Spawn();
@@ -989,7 +992,7 @@ namespace Oxide.Plugins
             foreach (var entity in entities)
             {
                 if (entity == null) continue;
-                if (entity.isDestroyed) continue;
+                if (entity.IsDestroyed) continue;
                 entity.KillMessage();
             }
             return true;
@@ -1081,5 +1084,61 @@ namespace Oxide.Plugins
 
             SendReply(player, string.Format(GetMsg("The structure was successfully copied as {0}", player.userID.ToString()), savename));
         }
+
+
+        [ChatCommand("cp_list")]
+        void cmdChatList(BasePlayer player, string command, string[] args)
+        {
+            if (!hasAccess(player, copyPermission))
+            {
+                SendReply(player,
+GetMsg("You don't have the permissions to use this command.", player.userID.ToString())); return;
+            }
+            //            if (args == null || args.Length == 0)
+            //            {
+            //                SendReply(player,
+            //GetMsg("Syntax: /cp_list", player.userID.ToString())); return;
+            //            }
+
+            //string path = subDirectory + filename;
+
+            Puts("dir=" + Path.GetFullPath(subDirectory));
+
+            if (datafile.ExistsDatafile(subDirectory))
+            {
+                Puts("dir=" + datafile.Directory);
+            }
+
+            // var data = Interface.GetMod().DataFileSystem.GetDatafile(path);
+            //  if (data["default"] == null || data["entities"] == null)
+            //  {
+            //       return GetMsg("This file is empty.", player.userID.ToString());
+            // }
+
+
+        }
+
+        // Process all files in the directory passed in, recurse on any directories 
+        // that are found, and process the files they contain.
+        public static void ProcessDirectory(string targetDirectory)
+        {
+            Console.WriteLine("directory was " + targetDirectory);
+            // Process the list of files found in the directory.
+            string[] fileEntries = Directory.GetFiles(targetDirectory);
+            foreach (string fileName in fileEntries)
+                ProcessFile(fileName);
+
+            // Recurse into subdirectories of this directory.
+            string[] subdirectoryEntries = Directory.GetDirectories(targetDirectory);
+            foreach (string subdirectory in subdirectoryEntries)
+                ProcessDirectory(subdirectory);
+        }
+
+        // Insert logic for processing found files here.
+        public static void ProcessFile(string path)
+        {
+            Console.WriteLine("Processed file '{0}'.", path);
+        }
+
     }
 }

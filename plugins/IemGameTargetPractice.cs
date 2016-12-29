@@ -551,7 +551,7 @@ namespace Oxide.Plugins
                     var targetbuff = new List<ReactiveTarget>();
                     for (int i = 0; i < gsm.eg.targets.Count; i++)
                     {
-                        if (gsm.eg.targets[i] != null && !gsm.eg.targets[i].isDestroyed)
+                        if (gsm.eg.targets[i] != null && !gsm.eg.targets[i].IsDestroyed)
                         {
                             targetbuff.Add(gsm.eg.targets[i]);
                         }
@@ -678,9 +678,7 @@ namespace Oxide.Plugins
                     //reset  the game banners
                     IemUI.CreateGameBanner(gsm.eg.player, "");
                     IemUI.CreateGameBanner2(gsm.eg.player, "");
-
-                    // if there is a fadeout banner, remove it
-                    CuiHelper.DestroyUi(gsm.eg.player, "CreateFadeoutBanner");
+                    
                 }
             }
 
@@ -721,20 +719,19 @@ namespace Oxide.Plugins
                     //    "Play Again", "Quit",
                     //    gsm.eg.wasConfirmed,
                     //    gsm.eg.backToTheMap);
-
-
                 }
 
                 public new void Exit(IemStateManager.StateManager sm)
                 {
                     TargetPracticeStateManager gsm = (TargetPracticeStateManager)sm;
 
-                    CuiHelper.DestroyUi(gsm.eg.player, "CreateFadeoutBanner");
+                    //CuiHelper.DestroyUi(gsm.eg.player, "CreateFadeoutBanner");
                     foreach (IemGameBase.IemPlayer iemPlayer in gsm.eg.Players.Values)
                     {
                         BasePlayer player = IemUtils.FindPlayerByID(iemPlayer.PlayerId);
                         IemUI.CreateGameBanner(player, "");
                     }
+                    gsm.eg.MarkComplete();
 
                 }
             }
